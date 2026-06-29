@@ -1,24 +1,24 @@
 
-GET http://localhost:3000/api/assets/67 HTTP/1.1
+GET http://localhost:3000/api/assets/269 HTTP/1.1
 
 
 ### Post 
-POST http://localhost:3000/api/assets HTTP/1.1
+POST http://localhost:3000/api/assets/ HTTP/1.1
 Content-Type: application/json
 
 {
-  "asset_id": 67,
-  "asset_number": null,
-  "serial_number": "R4N0CV055260157",
-  "device_type": "Laptop",
-  "brand": "Asus",
-  "model": "VivoBook_AsusLaptop",
-  "eth_mac_addr": null,
-  "wifi_mac_addr": "10-68-38-54-66-BA",
-  "bitlocker_key": "215314-162085-625779-155276-147653-614691-663861-171853",
+  "asset_id": 269,
+  "asset_number": "00000",
+  "serial_number": " 2XMH2G4",
+  "device_type": "Desktop",
+  "brand": "Dell",
+  "model": "Dell Pro Slim Essential QVS1260",
+  "eth_mac_addr": "D4-A2-CD-A9-C6-00",
+  "wifi_mac_addr": "08-F9-7E-0E-DC-7B",
+  "bitlocker_key": "000583-356840-105666-195195-035783-384912-419529-517055",
   "purchase_date": null,
   "status": "Available",
-  "specs": "RAM: 8",
+  "specs": null,
   "location": null
 }
 

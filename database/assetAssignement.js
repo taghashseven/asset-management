@@ -8,6 +8,7 @@ export async function createAssignment({
   employee_email,
   notes = null
 }) {
+  console.log("Creating assignment:", serial_number, employee_email, notes);
   const result = await db.run(
     `
     INSERT INTO asset_assignments (
