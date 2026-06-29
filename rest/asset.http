@@ -1,0 +1,29 @@
+
+GET http://localhost:3000/api/assets/67 HTTP/1.1
+
+
+### Post 
+POST http://localhost:3000/api/assets HTTP/1.1
+Content-Type: application/json
+
+{
+  "asset_id": 67,
+  "asset_number": null,
+  "serial_number": "R4N0CV055260157",
+  "device_type": "Laptop",
+  "brand": "Asus",
+  "model": "VivoBook_AsusLaptop",
+  "eth_mac_addr": null,
+  "wifi_mac_addr": "10-68-38-54-66-BA",
+  "bitlocker_key": "215314-162085-625779-155276-147653-614691-663861-171853",
+  "purchase_date": null,
+  "status": "Available",
+  "specs": "RAM: 8",
+  "location": null
+}
+
+
+
+####
+
+POST http://localhost:3000/api/assets

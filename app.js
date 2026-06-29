@@ -1,0 +1,88 @@
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import printerRoutes from "./printers/endpoint.js";
+import employeeRoutes from "./assets/endpoint.js";
+import assetRoutes from "./assets/assetsEndPoint.js";
+import assetEmployeeRoutes from "./assets/assetEmployeeEndPoint.js";
+import fs from "fs";
+import db from "./database/db.js";
+import monitorRoutes from "./assets/monitorEndpoint.js";
+import userMonitorRoutes from "./assets/userMonitorEndpoint.js";
+import viewEndpoints from "./assets/viewEndpoints.js";
+// import "./database/migrate/importComputerAssets.js";
+// import "./database/migrate/importEmployee.js";
+// import "./database/migrate/importEmployeeComputerAsset.js";
+// import "./database/migrate/importComputerfromExcel.js";
+// import "./database/migrate/importMonitor.js";
+// import "./database/migrate/importMonitorEmployee.js";   
+// import "./database/migrate/importMonitorFromCSV.js"; // Import the CSV import script
+
+
+
+const app = express();
+const PORT = 3000;
+
+// Replicate __dirname functionality because you are using ES Modules (import/export)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(express.json());
+
+// 1. Serve static assets out of the "public" directory
+app.use(express.static(path.join(__dirname, "public")));
+
+// 2. Mount API route
+app.use("/api/printers", printerRoutes);
+
+// mount employee routes
+app.use("/api/employees", employeeRoutes);
+
+// mount asset routes
+app.use("/api/assets", assetRoutes);
+
+// mount monitor routes (if you have them, otherwise ignore this)
+app.use("/api/monitors", monitorRoutes);
+
+// mount user monitor routes
+app.use("/api/usermonitors", userMonitorRoutes);
+
+// mount employee_assignment routes
+app.use("/api/assignments", assetEmployeeRoutes); 
+
+// mount view endpoints
+app.use("/api/views", viewEndpoints);
+
+// 3. Fallback route: Serve index.html for any other directory root access
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "assets", "view.html"));
+});
+
+// 2. Strict Router Middleware for static files
+app.use((req, res, next) => {
+    let urlPath = req.path;
+
+    // Handle root fallback straight away
+    if (urlPath === "/") {
+        urlPath = "/index.html";
+    }
+
+    // Check if the URL explicitly targets your allowed asset types
+    if (urlPath.endsWith('.html') || urlPath.endsWith('.js') || urlPath.endsWith('.css') || urlPath.endsWith('.jpg') || urlPath.endsWith('.png') || urlPath.endsWith('.ico')) {
+        // Map the URL path directly to your local file system root
+        const filePath = path.join(__dirname, urlPath);
+
+        // Verify the file actually exists on disk before attempting to serve it
+        if (fs.existsSync(filePath)) {
+            return res.sendFile(filePath);
+        } else {
+            return res.status(404).send('File Not Found');
+        }
+    }
+
+    // Deny access to any backend files (.js files are allowed above, but only if they exist in the paths requested)
+    res.status(403).send('Access Denied');
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on port http://localhost:${PORT}`);
+});
