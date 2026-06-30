@@ -71,6 +71,7 @@
                 <option value="10" >10</option>
                 <option value="25">25</option>
                 <option value="50" selected>50</option>
+                <option value="100" selected>100</option>
               </select>
               entries
             </div>
@@ -157,7 +158,7 @@ const CONFIG = {
  employees: {
    endpoint: "/api/employees",
    idField: "employee_id",
-   fields: ["email", "first_name", "last_name", "department", "job_title"]
+   fields: ["email", "first_name", "last_name", "department", "job_title"  , "active"]
  },
  "user-resources": {
    endpoint: "/api/views",
@@ -167,7 +168,7 @@ const CONFIG = {
  "computer-assets": {
    endpoint: "/api/assets",
    idField: "asset_id",
-   fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status" , "bitlocker_key" , "assigned_to"]
+   fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status" , "bitlocker_key" , "assigned_to" , "location"]
  },
  "asset-assignments": {
    endpoint: "/api/assignments",

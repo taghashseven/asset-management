@@ -1,5 +1,7 @@
-CREATE TABLE users (
-    
+
+
+CREATE TABLE IF NOT EXISTS users (
+
     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
 
     username TEXT NOT NULL UNIQUE,
@@ -9,8 +11,10 @@ CREATE TABLE users (
     CHECK (
         role IN (
             'user',
-            'admin' , 
+            'admin',
             'superadmin'
         )
     )
- ) ;
+);
+
+

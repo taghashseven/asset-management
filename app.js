@@ -10,6 +10,12 @@ import db from "./database/db.js";
 import monitorRoutes from "./assets/monitorEndpoint.js";
 import userMonitorRoutes from "./assets/userMonitorEndpoint.js";
 import viewEndpoints from "./assets/viewEndpoints.js";
+import authService  from "./admin/auth.endpoint.js";
+
+// middlware 
+import { authenticate } from "./middleware/auth.js";
+
+
 // import "./database/migrate/importComputerAssets.js";
 // import "./database/migrate/importEmployee.js";
 // import "./database/migrate/importEmployeeComputerAsset.js";
@@ -18,6 +24,8 @@ import viewEndpoints from "./assets/viewEndpoints.js";
 // import "./database/migrate/importMonitorEmployee.js";   
 // import "./database/migrate/importMonitorFromCSV.js"; // Import the CSV import script
 
+import dotenv from "dotenv";
+dotenv.config();
 
 
 const app = express();
@@ -28,8 +36,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.json());
 
+
+
 // 1. Serve static assets out of the "public" directory
 app.use(express.static(path.join(__dirname, "public")));
+
+// auth endpoint 
+app.use("/api/auth", authService);
 
 // 2. Mount API route
 app.use("/api/printers", printerRoutes);

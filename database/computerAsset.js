@@ -28,6 +28,9 @@ export async function getComputerAssetById(id) {
 
 export async function upsertComputerAsset(asset) {
   console.log("Upserting asset:", asset); // Log the asset being upserted
+
+  const assetNumber = asset.asset_number?.trim() === "" ? null : asset.asset_number;
+
   try {
     await db.run(
     `
@@ -62,7 +65,7 @@ export async function upsertComputerAsset(asset) {
       bitlocker_key = excluded.bitlocker_key
     `,
     [
-      asset.asset_number,
+      assetNumber,
       asset.serial_number,
       asset.device_type,
       asset.brand,
