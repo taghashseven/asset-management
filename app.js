@@ -15,7 +15,6 @@ import authService  from "./admin/auth.endpoint.js";
 // middlware 
 import { authenticate } from "./middleware/auth.js";
 
-
 // import "./database/migrate/importComputerAssets.js";
 // import "./database/migrate/importEmployee.js";
 // import "./database/migrate/importEmployeeComputerAsset.js";
@@ -34,8 +33,18 @@ const PORT = 3000;
 // Replicate __dirname functionality because you are using ES Modules (import/export)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 
+
+// console out all the end point that am hitting 
+app.use((req, res, next) => {
+    console.log(`Incoming request: ${req.method} ${req.url}`);
+    // if you want to log the body of POST requests, you can do so here
+    if (req.method === "POST") {
+        console.log("Request body:", req.body);
+    }
+    next();
+});
 
 
 // 1. Serve static assets out of the "public" directory
@@ -80,7 +89,7 @@ app.use((req, res, next) => {
     }
 
     // Check if the URL explicitly targets your allowed asset types
-    if (urlPath.endsWith('.html') || urlPath.endsWith('.js') || urlPath.endsWith('.css') || urlPath.endsWith('.jpg') || urlPath.endsWith('.png') || urlPath.endsWith('.ico')) {
+    if (urlPath.endsWith('.html') || urlPath.endsWith('.js') || urlPath.endsWith('.css') || urlPath.endsWith('.jpg') || urlPath.endsWith('.png') || urlPath.endsWith('.ico') || urlPath.endsWith('.pdf')) {
         // Map the URL path directly to your local file system root
         const filePath = path.join(__dirname, urlPath);
 

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'user'
     CHECK (
         role IN (
-            'user',
+                        'user',
             'admin',
             'superadmin'
         )
@@ -18,3 +18,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 
+
+ALTER TABLE employees
+ADD COLUMN note TEXT;

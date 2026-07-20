@@ -118,6 +118,7 @@ CREATE TABLE monitors (
             'Assigned',
             'Repair',
             'Retired'
+            -- please add standby 
         )
     ),
 
@@ -169,31 +170,29 @@ WHERE date_returned IS NULL;
 CREATE TABLE printers (
     printer_id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-    asset_tag TEXT NOT NULL UNIQUE,
-
+    asset_tag TEXT  UNIQUE,
     printer_name TEXT NOT NULL,
-
     brand TEXT,
     model TEXT,
-
     serial_number TEXT UNIQUE,
-
     ip_address TEXT,
     mac_address TEXT,
 
-    status TEXT NOT NULL DEFAULT 'Active',
+    status TEXT NOT NULL DEFAULT 'Active'
+    CHECK (
+        status IN (
+            'Active',
+            'Inactive',
+            'Retired' ,
+            'standby'
+        )
+    ),
 
     is_color INTEGER NOT NULL DEFAULT 0,
-
+    page_count INTEGER NOT NULL DEFAULT 0,
     location TEXT,
-
     purchase_date DATE,
-
-    toner TEXT,
-    toner_status TEXT,
-
-    notes TEXT,
-
+    toner_code TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -249,6 +248,9 @@ CREATE TABLE asset_logs (
         REFERENCES computer_assets(asset_id)
         ON DELETE CASCADE
 );
+
+
+
 
 -- =====================================================
 -- CURRENT COMPUTER ASSIGNMENTS VIEW

@@ -1,0 +1,54 @@
+<!-- Specialized Printer Dashboard View -->
+<div id="printerViewWrapper" class="hidden space-y-6 h-full overflow-y-auto pb-12">
+  <!-- Summary Metrics Bar -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+      <div class="p-3 bg-blue-100 text-blue-600 rounded-lg"><i data-lucide="printer" class="w-6 h-6"></i></div>
+      <div>
+        <p class="text-sm text-slate-500 font-medium">Total Printers</p>
+        <h4 id="metricTotalPrinters" class="text-2xl font-bold text-slate-800">0</h4>
+      </div>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+      <div class="p-3 bg-emerald-100 text-emerald-600 rounded-lg"><i data-lucide="check-circle" class="w-6 h-6"></i></div>
+      <div>
+        <p class="text-sm text-slate-500 font-medium">Online</p>
+        <h4 id="metricOnlinePrinters" class="text-2xl font-bold text-slate-800">0</h4>
+      </div>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+      <div class="p-3 bg-amber-100 text-amber-600 rounded-lg"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
+      <div>
+        <p class="text-sm text-slate-500 font-medium">Low Toner</p>
+        <h4 id="metricLowToner" class="text-2xl font-bold text-slate-800">0</h4>
+      </div>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
+      <div class="p-3 bg-rose-100 text-rose-600 rounded-lg"><i data-lucide="wifi-off" class="w-6 h-6"></i></div>
+      <div>
+        <p class="text-sm text-slate-500 font-medium">Offline</p>
+        <h4 id="metricOfflinePrinters" class="text-2xl font-bold text-slate-800">0</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Controls -->
+  <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+    <div class="text-sm text-slate-500 font-medium">
+      Device Management & Live Status Monitor
+    </div>
+    <div class="flex gap-3">
+      <button id="refreshButton" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-4 rounded-lg flex items-center gap-2 font-medium text-sm transition">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        <span>Refresh Status</span>
+      </button>
+      <button id="newPrinterBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center gap-2 font-medium text-sm transition">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        <span>Add New Printer</span>
+      </button>
+    </div>
+  </div>
+ 
+  <!-- Grid for Dynamic Printer Cards -->
+  <div id="printer-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+</div>

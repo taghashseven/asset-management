@@ -3,7 +3,7 @@ import { open } from "sqlite";
 import fs from "fs/promises";
 import path from "path";
 
-const db = await open({
+export const db = await open({
     filename: "./assets.db",
     driver: sqlite3.Database
 });

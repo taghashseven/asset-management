@@ -35,35 +35,25 @@ router.get("/:id", async (req, res) => {
 });
 
 /**
- * CREATE employee
+ * upsert employee (create or update)
  */
 router.post("/", async (req, res) => {
+  console.log("Received employee data:", req.body); // Log the incoming request body for debugging
   try {
-    const result = await Employee.create(req.body);
+    const result = await Employee.upsert(req.body);
 
     res.status(201).json({
-      message: "Employee created",
+      message: "Employee upserted successfully",
+
       id: result.lastID
     });
   } catch (err) {
+    console.error("Error upserting employee:", err); // Log the error for debugging
     res.status(500).json({ error: err.message });
   }
 });
 
-/**
- * UPDATE employee
- */
-router.put("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
 
-    await Employee.update(id, req.body);
-
-    res.json({ message: "Employee updated" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 /**
  * DELETE employee
@@ -76,6 +66,30 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ message: "Employee deleted" });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// forms end point 
+router.get("/forms/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const forms = await Employee.getAllEmployeeForms(id);
+    res.json(forms);
+  }
+  catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}) , 
+
+// create a new form for an employee
+router.post("/forms/create", async (req, res) => {
+  try {
+    console.log("Creating form with data:", req.body);
+    const formId = await Employee.uploadEmployeeForm(req.body.employee_id , req.body.file_path);
+    res.status(201).json({ id: formId });
+  } catch (err) {
+    console.error("Error creating form:", err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,4 +1,5 @@
 import snmp from "net-snmp";
+import  db  from "../database/db.js";
 
 const PRINTERS = [
     { ip: "192.168.28.68",  name: "AMA-Office" },
@@ -161,11 +162,25 @@ async function scanPrinter(printer) {
 }
 
 export async function getPrinterData() {
+
     console.log("Starting network printer matrix scan...");
     
     // Process all printers concurrently 
     const scanPromises = PRINTERS.map(printer => scanPrinter(printer));
     const results = await Promise.all(scanPromises);
+
+    //update the count page from each printer in the database based by ip address
+    for (const printer of results) {
+        if (printer.status === "Online" && printer.pagesPrinted !== null) {
+            try {
+                await db.run("UPDATE printers SET page_count = ? WHERE ip_address = ?", [printer.pagesPrinted, printer.ip]);
+            }
+            catch (error) {
+                console.error(`Error updating page count for printer ${printer.ip}:`, error);
+            }
+        }
+    }
+
     
     return results;
 }

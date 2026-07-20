@@ -4,7 +4,8 @@ import {
   getAllAssignments,
   getActiveAssignments,
   returnAssignment,
-  deleteAssignment
+  deleteAssignment , 
+  updateAssignment
 } from "../database/assetAssignement.js";
 
 const router = express.Router();
@@ -38,6 +39,7 @@ router.get("/active", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   try {
+    console.log("Creating assignment with data:", req.body);  
     const assignmentId = await createAssignment(req.body);
 
     res.status(201).json({
@@ -49,6 +51,21 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// update 
+router.post("/update" , async (req, res) => {
+  try {
+    await updateAssignment(req.body.assignment_id, req.body);
+    res.json({
+      success: true,
+      message: "Assignment updated successfully"
+    });
+  }
+  catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 /**
  * RETURN assigned asset
@@ -87,14 +104,14 @@ router.delete("/:id", async (req, res) => {
  */
 router.get("/help", (req, res) => {
   res.send(`
-Available endpoints:
+      Available endpoints:
 
-GET    /
-GET    /active
-POST   /
-PUT    /:id/return
-DELETE /:id
-  `);
+      GET    /
+      GET    /active
+      POST   /
+      PUT    /:id/return
+      DELETE /:id
+    `);
 });
 
 export default router;

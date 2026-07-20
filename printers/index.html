@@ -323,6 +323,7 @@ function handleWidthSliderChange(slider) {
 }
 
 async function loadModule(module){
+
   currentModule = module;
   currentPage = 1;
   
@@ -686,10 +687,11 @@ async function saveRecord(e){
 }
 
 async function updateRecord(e){
+console.log("Updating record with ID:", editId);
  e.preventDefault();
  const payload = Object.fromEntries(new FormData(e.target));
  await fetch(`${CONFIG[currentModule].endpoint}/${editId}`, {
-     method:"PUT",
+     method:"POST",
      headers:{"Content-Type":"application/json"},
      body: JSON.stringify(payload)
  });

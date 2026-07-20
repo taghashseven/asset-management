@@ -1,0 +1,93 @@
+-- 1. Start a strict transaction to queue and hold incoming live traffic safely
+BEGIN IMMEDIATE TRANSACTION;
+
+-- 2. Turn off Foreign Key constraints so we can drop tables without trigger errors
+PRAGMA foreign_keys = OFF;
+
+-- 3. Create a temporary, identical backup table to hold your current production data
+CREATE TABLE temp_assignments_backup AS 
+SELECT 
+    assignment_id, 
+    serial_number, 
+    employee_email, 
+    date_issued, 
+    date_returned, 
+    notes 
+FROM asset_assignments;
+
+-- 3b. AUTOMATED CLEANUP: Find open duplicates and force-close the older ones.
+-- This sets the return date to the issued date (or current date if issued is null)
+-- for any open assignment that isn't the most recent one.
+UPDATE temp_assignments_backup
+SET date_returned = COALESCE(date_issued, DATE('now'))
+WHERE date_returned IS NULL
+  AND assignment_id NOT IN (
+      SELECT MAX(assignment_id)
+      FROM temp_assignments_backup
+      WHERE date_returned IS NULL
+      GROUP BY serial_number
+  );
+
+-- 4. Drop the original production table
+DROP TABLE asset_assignments;
+
+-- 5. Re-create the table with your exact column layouts, but the updated CHECK constraint
+CREATE TABLE asset_assignments (
+    assignment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    serial_number TEXT NOT NULL,
+    employee_email TEXT NOT NULL,
+
+    date_issued DATE,
+    date_returned DATE,
+
+    notes TEXT,
+
+    -- Updated Constraint: Allows date_returned to exist even if date_issued is NULL
+    CHECK (
+        date_returned IS NULL
+        OR date_issued IS NULL
+        OR date_returned >= date_issued
+    ),
+
+    FOREIGN KEY(serial_number)
+        REFERENCES computer_assets(serial_number)
+        ON DELETE RESTRICT,
+
+    FOREIGN KEY(employee_email)
+        REFERENCES employees(email)
+        ON DELETE RESTRICT
+);
+
+-- 5b. Create the partial unique index to enforce the rule going forward
+CREATE UNIQUE INDEX idx_unique_active_assignment 
+ON asset_assignments (serial_number) 
+WHERE date_returned IS NULL;
+
+-- 6. Move the cleaned records back into the newly built table
+INSERT INTO asset_assignments (
+    assignment_id, 
+    serial_number, 
+    employee_email, 
+    date_issued, 
+    date_returned, 
+    notes
+)
+SELECT 
+    assignment_id, 
+    serial_number, 
+    employee_email, 
+    date_issued, 
+    date_returned, 
+    notes
+FROM temp_assignments_backup;
+
+-- 7. Safely destroy the temporary backup table
+DROP TABLE temp_assignments_backup;
+
+-- 8. Restore constraint enforcement and commit all changes instantly
+PRAGMA foreign_keys = ON;
+COMMIT;
+
+-- 9. Final verification check 
+PRAGMA foreign_key_check;
