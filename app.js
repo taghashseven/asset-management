@@ -11,6 +11,7 @@ import monitorRoutes from "./assets/monitorEndpoint.js";
 import userMonitorRoutes from "./assets/userMonitorEndpoint.js";
 import viewEndpoints from "./assets/viewEndpoints.js";
 import authService  from "./admin/auth.endpoint.js";
+import otherEquipment from "./assets/otherEquipment.js";
 
 // middlware 
 import { authenticate } from "./middleware/auth.js";
@@ -73,6 +74,9 @@ app.use("/api/assignments", assetEmployeeRoutes);
 
 // mount view endpoints
 app.use("/api/views", viewEndpoints);
+
+// other equipment 
+app.use("/api/other-equipment" , otherEquipment )
 
 // 3. Fallback route: Serve index.html for any other directory root access
 app.get("/", (req, res) => {

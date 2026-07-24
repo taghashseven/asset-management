@@ -22,4 +22,4 @@ CREATE TABLE other_equipment_images (
     FOREIGN KEY (equipment_id)
         REFERENCES other_equipment(equipment_id)
         ON DELETE CASCADE
-);
+);      
