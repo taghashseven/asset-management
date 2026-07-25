@@ -17,54 +17,72 @@ export const CONFIG = {
   },
 
   "user-resources": {
-        endpoint: "/api/views",
-        idField: "employee_id",
-        fields: ["employee_id", "department", "email", "first_name", "last_name", "computers", "monitors", "forms"],
-        fieldTypes: {
-            computers: { 
-                type: "array", 
-                displayField: ["brand", "serial_number"],
-                targetModule: "computer-assets",  // Module to navigate to
-                targetField: "serial_number"       // Field in target module to match
-            },
-            monitors: { 
-                type: "array", 
-                displayField: ["brand", "serial_number"],
-                targetModule: "monitors",
-                targetField: "serial_number"
-            },
-            forms: {
-                type: "array",
-                displayField: "path",
-                add: "api/employees/forms/create"
-            }
+    endpoint: "/api/views",
+    idField: "employee_id",
+    fields: ["employee_id", "department", "email", "first_name", "last_name", "computers", "monitors", "forms"],
+    fieldTypes: {
+      computers: { 
+        type: "array", 
+        displayField: ["brand", "serial_number"],
+        routeTo: {
+          module: "computer-assets",
+          matchField: "serial_number"
         }
-    } ,
+      },
+      monitors: { 
+        type: "array", 
+        displayField: ["brand", "serial_number"],
+        routeTo: {
+          module: "monitors",
+          matchField: "serial_number"
+        }
+      },
+      forms: {
+        type: "array",
+        displayField: "path",
+        routeTo: {
+          module: "forms",
+          matchField: "form_id"
+        }
+      }
+    }
+  },
 
   forms: {
-    endpoint: "/api/employees/forms/1",
+    endpoint: "/api/employees/forms",
     create: "/api/employees/forms/create",
     idField: "form_id",
-    fields: ["form_id", "employee_id", "file_path"],
+    fields: ["form_id", "employee_id", "file_path", "email"],
     fieldTypes: {
       date_submitted: "date",
-      file_path: "file"
+      file_path: {
+        type: "file",
+        api: {
+          action: "open_url",
+          urlField: "file_path"
+        }
+      },
+      email: {
+        type: "string",
+        readOnly: true
+      }
     },
     customViewFile: null
   },
-    "computer-assets": {
-        endpoint: "/api/assets",
-        idField: "asset_id",
-        fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location"],
-        fieldTypes: {
-            status: ["Available", "Deployed", "In Repair", "Scrapped"],
-            bitlocker_key: {
-                type: "text",
-                truncate: 15 // Truncates value to 15 characters
-            } 
-        },
-        customViewFile: null
-    } ,
+
+  "computer-assets": {
+    endpoint: "/api/assets",
+    idField: "asset_id",
+    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location"],
+    fieldTypes: {
+      status: ["Available", "Deployed", "In Repair", "Scrapped"],
+      bitlocker_key: {
+        type: "text",
+        truncate: 15
+      } 
+    },
+    customViewFile: null
+  },
 
   "asset-assignments": {
     endpoint: "/api/assignments",
@@ -74,7 +92,12 @@ export const CONFIG = {
     fieldTypes: {
       date_issued: "date",
       date_returned: "date",
-      notes: "textarea"
+      notes: {
+        type: "textarea",
+        updateField: {
+          endpoint: "/api/assignments/update-notes"
+        }
+      }
     },
     customViewFile: null,
     delete: true
@@ -194,7 +217,6 @@ let editId = null;
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Navigation button binding
   document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("bg-slate-800"));
@@ -204,7 +226,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Global UI controls
   document.getElementById("refreshButton")?.addEventListener("click", () => {
     loadModule(currentModule, true, activePrinterId);
   });
@@ -221,7 +242,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.addEventListener("click", closeColumnDropdown);
   document.getElementById("closeDrawerBtn")?.addEventListener("click", closeDrawer);
 
-  // Default app launch
   loadModule("employees");
 });
 
@@ -359,7 +379,6 @@ export async function loadModule(module, forceRefresh = false, dynamicParam = nu
   const targetConfig = CONFIG[module];
   if (!targetConfig) return;
 
-  // Render Layout Containers
   if (targetConfig.standalone) {
     document.getElementById("standardHeader")?.classList.add("hidden");
     document.getElementById("tableViewWrapper")?.classList.add("hidden");
@@ -394,7 +413,6 @@ export async function loadModule(module, forceRefresh = false, dynamicParam = nu
 
   initializeStorageConfiguration(module);
 
-  // Update Header Title
   const titleEl = document.getElementById("pageTitle");
   if (titleEl) {
     titleEl.innerText =
@@ -408,7 +426,6 @@ export async function loadModule(module, forceRefresh = false, dynamicParam = nu
     return;
   }
 
-  // API Data Acquisition
   try {
     if (targetConfig.endpoint || targetConfig.create || targetConfig.update) {
       const resolvedParam = dynamicParam || (module === "printer-logs" ? activePrinterId : null);
@@ -467,211 +484,189 @@ async function renderRouter() {
   renderDefaultTable(filteredData, config);
 }
 
-/**
- * Global Copy Utility for Truncated Values
- */
 export function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        if (typeof showToast === "function") {
-            showToast("Copied to clipboard!", "success");
-        } else {
-            console.log("Copied:", text);
-        }
-    }).catch(err => {
-        console.error("Failed to copy text: ", err);
-    });
+  navigator.clipboard.writeText(text).then(() => {
+    if (typeof showToast === "function") {
+      showToast("Copied to clipboard!", "success");
+    } else {
+      console.log("Copied:", text);
+    }
+  }).catch(err => {
+    console.error("Failed to copy text: ", err);
+  });
 }
 window.copyToClipboard = copyToClipboard;
 
-
 /**
  * Dynamic Default Table Rendering Engine
- * Filters columns explicitly based on `config.fields`.
  */
 export function renderDefaultTable(data = [], config = {}) {
-    const tableBody = document.getElementById("tableBody");
-    if (!tableBody) return;
+  const tableBody = document.getElementById("tableBody");
+  if (!tableBody) return;
 
-    if (!Array.isArray(data) || data.length === 0) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="100" class="p-8 text-center text-slate-400 font-medium bg-white rounded-lg border border-slate-200">
-                    No records found.
-                </td>
-            </tr>
-        `;
-        return;
-    }
+  if (!Array.isArray(data) || data.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="100" class="p-8 text-center text-slate-400 font-medium bg-white rounded-lg border border-slate-200">
+          No records found.
+        </td>
+      </tr>
+    `;
+    return;
+  }
 
-    const sampleRecord = data[0];
-    
-    // STRICT FILTER: Use defined `config.fields` if present, otherwise fallback to sample record keys
-    const headers = (Array.isArray(config.fields) && config.fields.length > 0)
-        ? config.fields
-        : Object.keys(sampleRecord);
+  const sampleRecord = data[0];
+  const headers = (Array.isArray(config.fields) && config.fields.length > 0)
+    ? config.fields
+    : Object.keys(sampleRecord);
 
-    const fieldTypes = config.fieldTypes || {};
+  const fieldTypes = config.fieldTypes || {};
 
-    // 1. Generate Table Headers
-    const headerRowHTML = headers.map(header => {
-        const title = header.replaceAll('_', ' ').toUpperCase();
-        return `<th class="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">${title}</th>`;
-    }).join('') + `<th class="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Actions</th>`;
+  const headerRowHTML = headers.map(header => {
+    const title = header.replaceAll('_', ' ').toUpperCase();
+    return `<th class="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">${title}</th>`;
+  }).join('') + `<th class="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Actions</th>`;
 
-    // 2. Generate Table Data Rows
-    const dataRowsHTML = data.map((row) => {
-        // Fallback to primary key in config or the first key in the row data
-        const primaryKey = config.idField || Object.keys(row)[0];
-        const recordId = row[primaryKey];
+  const dataRowsHTML = data.map((row) => {
+    const primaryKey = config.idField || Object.keys(row)[0];
+    const recordId = row[primaryKey];
 
-        const cellsHTML = headers.map(header => {
-            const rawValue = row[header];
-            const fieldConfig = fieldTypes[header];
+    const cellsHTML = headers.map(header => {
+      const rawValue = row[header];
+      const fieldConfig = fieldTypes[header];
 
-            let cellContent = '';
+      let cellContent = '';
 
-            // Handle Array Structures
-            if (typeof fieldConfig === 'object' && fieldConfig.type === 'array') {
-                const itemsList = Array.isArray(rawValue) ? rawValue : [];
+      // --- 1. DIRECT API LINK HANDLER ---
+      if (typeof fieldConfig === 'object' && fieldConfig.api) {
+        const urlKey = fieldConfig.api.urlField || header;
+        const targetUrl = row[urlKey] || rawValue;
 
-                if (itemsList.length === 0) {
-                    cellContent = `<span class="text-xs text-slate-400 italic">None</span>`;
-                } 
-                // Image Array Handler
-                else if (header === 'images' || fieldConfig.fileType === 'file') {
-                    const displayField = fieldConfig.displayField || 'file_path';
-                    const maxVisible = 3;
-                    const visibleItems = itemsList.slice(0, maxVisible);
-                    const extraCount = itemsList.length - maxVisible;
+        if (targetUrl) {
+          const fileName = String(targetUrl).split('\\').pop().split('/').pop();
+          cellContent = `
+            <a href="/${targetUrl}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition" title="${targetUrl}">
+              <span>📄 ${fileName}</span>
+              <span class="text-[10px]">↗</span>
+            </a>
+          `;
+        } else {
+          cellContent = `<span class="text-xs text-slate-400 italic">No File</span>`;
+        }
+      }
+      // --- 2. ARRAY HANDLER (Supports routeTo navigation) ---
+      else if (typeof fieldConfig === 'object' && fieldConfig.type === 'array') {
+        const itemsList = Array.isArray(rawValue) ? rawValue : [];
 
-                    const thumbsHTML = visibleItems.map(item => {
-                        const relativePath = typeof item === 'object' ? item[displayField] : item;
-                        const fileName = String(relativePath || '').split('\\').pop().split('/').pop();
-                        const srcUrl = String(relativePath || '').startsWith('/') ? relativePath : `/${relativePath}`;
+        if (itemsList.length === 0) {
+          cellContent = `<span class="text-xs text-slate-400 italic">None</span>`;
+        } else if (header === 'images' || fieldConfig.fileType === 'file') {
+          const displayField = fieldConfig.displayField || 'file_path';
+          const maxVisible = 3;
+          const visibleItems = itemsList.slice(0, maxVisible);
+          const extraCount = itemsList.length - maxVisible;
 
-                        return `
-                            <a href="${srcUrl}" target="_blank" title="${fileName}" class="inline-block relative group">
-                                <img src="${srcUrl}" 
-                                     alt="${fileName}" 
-                                     class="w-8 h-8 object-cover rounded border border-slate-200 shadow-sm hover:scale-110 hover:z-10 hover:border-blue-500 transition-all duration-150 cursor-pointer"
-                                     onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22 fill=%22%2394a3b8%22 viewBox=%220 0 16 16%22><path d=%22M14 3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12zM2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2z%22/><path d=%22M10.648 8.646a.5.5 0 0 1 .577-.093l3.777 1.947V14h-12v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z%22/></svg>';" />
-                            </a>
-                        `;
-                    }).join('');
+          const thumbsHTML = visibleItems.map(item => {
+            const relativePath = typeof item === 'object' ? item[displayField] : item;
+            const fileName = String(relativePath || '').split('\\').pop().split('/').pop();
+            const srcUrl = String(relativePath || '').startsWith('/') ? relativePath : `/${relativePath}`;
 
-                    const extraBadgeHTML = extraCount > 0 
-                        ? `<span class="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-1 rounded-md border border-slate-200" title="${extraCount} more">+${extraCount}</span>` 
-                        : '';
+            return `
+              <a href="${srcUrl}" target="_blank" title="${fileName}" class="inline-block relative group">
+                <img src="${srcUrl}" 
+                     alt="${fileName}" 
+                     class="w-8 h-8 object-cover rounded border border-slate-200 shadow-sm hover:scale-110 hover:z-10 hover:border-blue-500 transition-all duration-150 cursor-pointer"
+                     onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22 fill=%22%2394a3b8%22 viewBox=%220 0 16 16%22><path d=%22M14 3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12zM2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2z%22/><path d=%22M10.648 8.646a.5.5 0 0 1 .577-.093l3.777 1.947V14h-12v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z%22/></svg>';" />
+              </a>
+            `;
+          }).join('');
 
-                    cellContent = `<div class="flex items-center gap-1.5 flex-wrap">${thumbsHTML}${extraBadgeHTML}</div>`;
-                } 
-                // Non-Image Array Handler
-                else {
-                    const displayConfig = fieldConfig.displayField || fieldConfig.display;
-                    const targetModule = fieldConfig.targetModule;
-                    const targetField = fieldConfig.targetField || "serial_number";
+          const extraBadgeHTML = extraCount > 0 
+            ? `<span class="text-[10px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-1 rounded-md border border-slate-200" title="${extraCount} more">+${extraCount}</span>` 
+            : '';
 
-                    const badgesHTML = itemsList.map(item => {
-                        if (typeof item !== 'object' || item === null) {
-                            return `<span class="inline-block px-2 py-0.5 text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200 rounded-md">${item}</span>`;
-                        }
+          cellContent = `<div class="flex items-center gap-1.5 flex-wrap">${thumbsHTML}${extraBadgeHTML}</div>`;
+        } else {
+          const displayConfig = fieldConfig.displayField || fieldConfig.display;
+          const routeConfig = fieldConfig.routeTo || {};
 
-                        let displayText = "";
-                        if (Array.isArray(displayConfig)) {
-                            const combinedValues = displayConfig
-                                .map(key => item[key])
-                                .filter(val => val !== undefined && val !== null && val !== "");
-                            displayText = combinedValues.join(" • ");
-                        } else if (typeof displayConfig === 'string') {
-                            displayText = item[displayConfig];
-                        } else {
-                            displayText = Object.values(item).find(val => typeof val !== 'object') || '-';
-                        }
-
-                        const filterKey = item[targetField] || item.serial_number || displayText;
-
-                        if (targetModule) {
-                            return `
-                                <button 
-                                    type="button"
-                                    onclick="navigateAndFilter('${targetModule}', '${filterKey}')"
-                                    title="Click to view record in ${targetModule.replaceAll('-', ' ')}"
-                                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition cursor-pointer group"
-                                >
-                                    <span>${displayText || '-'}</span>
-                                    <span class="text-[10px] text-blue-500 group-hover:translate-x-0.5 transition-transform">↗</span>
-                                </button>
-                            `;
-                        }
-
-                        return `<span class="inline-block px-2 py-0.5 text-xs font-mono font-medium bg-slate-100 text-slate-700 border border-slate-200 rounded-md">${displayText || '-'}</span>`;
-                    }).join('');
-
-                    cellContent = `<div class="flex items-center gap-1.5 flex-wrap">${badgesHTML}</div>`;
-                }
-            } 
-            // Handle Direct Objects
-            else if (typeof rawValue === 'object' && rawValue !== null) {
-                cellContent = `<span class="text-xs text-slate-500 font-mono">${JSON.stringify(rawValue)}</span>`;
-            } 
-            // Handle Scalar Primitives (Text, Numbers, BitLocker Keys)
-            else {
-                const strValue = String(rawValue ?? '-');
-
-                const truncateLimit = (typeof fieldConfig === 'object') 
-                    ? parseInt(fieldConfig.truncate || fieldConfig.trancate || fieldConfig.maxLen) 
-                    : NaN;
-
-                if (!isNaN(truncateLimit) && strValue.length > truncateLimit) {
-                    const shortText = strValue.substring(0, truncateLimit) + '...';
-
-                    cellContent = `
-                        <div class="inline-flex items-center gap-1.5 group" title="${strValue}">
-                            <span class="text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded">
-                                ${shortText}
-                            </span>
-                            <button 
-                                type="button" 
-                                onclick="copyToClipboard('${strValue}')"
-                                class="text-[10px] text-slate-400 hover:text-blue-600 transition font-sans"
-                                title="Copy full value"
-                            >
-                                📋
-                            </button>
-                        </div>
-                    `;
-                } else {
-                    cellContent = `<span class="text-sm text-slate-700">${rawValue ?? '-'}</span>`;
-                }
+          const badgesHTML = itemsList.map(item => {
+            if (typeof item !== 'object' || item === null) {
+              return `<span class="inline-block px-2 py-0.5 text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200 rounded-md">${item}</span>`;
             }
 
-            return `<td class="px-4 py-3 align-middle">${cellContent}</td>`;
-        }).join('');
+            let displayText = "";
+            if (Array.isArray(displayConfig)) {
+              displayText = displayConfig.map(key => item[key]).filter(Boolean).join(" • ");
+            } else if (typeof displayConfig === 'string') {
+              displayText = item[displayConfig];
+            } else {
+              displayText = Object.values(item).find(val => typeof val !== 'object') || '-';
+            }
 
-        // Action Buttons Column
-        const actionsHTML = `
-            <td class="px-4 py-3 text-right align-middle space-x-2">
-                <button onclick="editRecord('${recordId}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">
-                    Edit
+            const matchKey = routeConfig.matchField ? item[routeConfig.matchField] : (item.serial_number || displayText);
+
+            if (routeConfig.module) {
+              return `
+                <button 
+                  type="button"
+                  onclick="navigateAndFilter('${routeConfig.module}', '${matchKey}')"
+                  title="Click to view record in ${routeConfig.module.replaceAll('-', ' ')}"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition cursor-pointer group"
+                >
+                  <span>${displayText || '-'}</span>
+                  <span class="text-[10px] text-blue-500 group-hover:translate-x-0.5 transition-transform">↗</span>
                 </button>
-                ${config.delete ? `<button onclick="deleteRecord('${recordId}')" class="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline">Delete</button>` : ''}
-            </td>
-        `;
+              `;
+            }
 
-        return `
-            <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
-                ${cellsHTML}
-                ${actionsHTML}
-            </tr>
-        `;
+            return `<span class="inline-block px-2 py-0.5 text-xs font-mono font-medium bg-slate-100 text-slate-700 border border-slate-200 rounded-md">${displayText || '-'}</span>`;
+          }).join('');
+
+          cellContent = `<div class="flex items-center gap-1.5 flex-wrap">${badgesHTML}</div>`;
+        }
+      } 
+      // --- 3. OBJECT HANDLER ---
+      else if (typeof rawValue === 'object' && rawValue !== null) {
+        cellContent = `<span class="text-xs text-slate-500 font-mono">${JSON.stringify(rawValue)}</span>`;
+      } 
+      // --- 4. SCALAR PRIMITIVES HANDLER ---
+      else {
+        const strValue = String(rawValue ?? '-');
+        const truncateLimit = (typeof fieldConfig === 'object') ? parseInt(fieldConfig.truncate || fieldConfig.maxLen) : NaN;
+
+        if (!isNaN(truncateLimit) && strValue.length > truncateLimit) {
+          const shortText = strValue.substring(0, truncateLimit) + '...';
+          cellContent = `
+            <div class="inline-flex items-center gap-1.5 group" title="${strValue}">
+              <span class="text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded">
+                ${shortText}
+              </span>
+              <button type="button" onclick="copyToClipboard('${strValue}')" class="text-[10px] text-slate-400 hover:text-blue-600 transition font-sans" title="Copy full value">📋</button>
+            </div>
+          `;
+        } else {
+          cellContent = `<span class="text-sm text-slate-700">${rawValue ?? '-'}</span>`;
+        }
+      }
+
+      return `<td class="px-4 py-3 align-middle">${cellContent}</td>`;
     }).join('');
 
-    // Update DOM
-    const tableHead = document.getElementById("tableHead");
-    if (tableHead) tableHead.innerHTML = `<tr>${headerRowHTML}</tr>`;
-    tableBody.innerHTML = dataRowsHTML;
-}
+    const actionsHTML = `
+      <td class="px-4 py-3 text-right align-middle space-x-2">
+        <button onclick="editRecord('${recordId}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">Edit</button>
+        ${config.delete ? `<button onclick="deleteRecord('${recordId}')" class="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline">Delete</button>` : ''}
+      </td>
+    `;
 
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">${cellsHTML}${actionsHTML}</tr>`;
+  }).join('');
+
+  const tableHead = document.getElementById("tableHead");
+  if (tableHead) tableHead.innerHTML = `<tr>${headerRowHTML}</tr>`;
+  tableBody.innerHTML = dataRowsHTML;
+}
 
 /* ==========================================================================
    PAGINATION & SEARCH FILTER CONTROLLERS
@@ -765,18 +760,11 @@ export function generateFormFieldHTML(field, value = "", config = {}) {
         <div class="nested-item-row bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-between gap-3 shadow-sm">
           <div class="flex items-center gap-3 overflow-hidden">
             <a href="${srcUrl}" target="_blank" title="Click to view file">
-              <img src="${srcUrl}" 
-                   alt="${fileName}" 
-                   class="w-12 h-12 object-cover rounded border border-slate-300 hover:opacity-80 transition cursor-pointer flex-shrink-0"
-                   onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22 fill=%22%2394a3b8%22 viewBox=%220 0 16 16%22><path d=%22M14 3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12zM2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2z%22/><path d=%22M10.648 8.646a.5.5 0 0 1 .577-.093l3.777 1.947V14h-12v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z%22/></svg>';" />
+              <img src="${srcUrl}" alt="${fileName}" class="w-12 h-12 object-cover rounded border border-slate-300 hover:opacity-80 transition cursor-pointer flex-shrink-0" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22 fill=%22%2394a3b8%22 viewBox=%220 0 16 16%22><path d=%22M14 3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12zM2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2z%22/><path d=%22M10.648 8.646a.5.5 0 0 1 .577-.093l3.777 1.947V14h-12v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z%22/></svg>';" />
             </a>
             <div class="overflow-hidden">
-              <a href="${srcUrl}" target="_blank" class="text-xs font-semibold text-slate-700 hover:text-blue-600 truncate block" title="${fileName}">
-                ${fileName}
-              </a>
-              <span class="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block mt-0.5">
-                Saved in DB
-              </span>
+              <a href="${srcUrl}" target="_blank" class="text-xs font-semibold text-slate-700 hover:text-blue-600 truncate block" title="${fileName}">${fileName}</a>
+              <span class="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block mt-0.5">Saved in DB</span>
             </div>
           </div>
           <a href="${srcUrl}" target="_blank" class="text-xs text-blue-600 hover:underline flex-shrink-0 font-medium">View ↗</a>
@@ -787,9 +775,7 @@ export function generateFormFieldHTML(field, value = "", config = {}) {
       <div class="col-span-full border border-slate-200 bg-slate-50 p-3 rounded-lg space-y-3">
         <div class="flex justify-between items-center border-b border-slate-200 pb-2">
           <label class="font-bold text-sm text-slate-700">${labelText}</label>
-          <button type="button" onclick="addFlatFileItem('${field}')" class="bg-blue-600 text-white px-2.5 py-1 rounded-md text-xs font-medium hover:bg-blue-700 transition">
-            + Add New Image
-          </button>
+          <button type="button" onclick="addFlatFileItem('${field}')" class="bg-blue-600 text-white px-2.5 py-1 rounded-md text-xs font-medium hover:bg-blue-700 transition">+ Add New Image</button>
         </div>
         <div id="nested-container-${field}" class="space-y-2">
           ${itemsHTML.length > 0 ? itemsHTML : '<p class="text-xs text-slate-400 italic">No images attached.</p>'}
@@ -797,15 +783,24 @@ export function generateFormFieldHTML(field, value = "", config = {}) {
       </div>`;
   }
 
-  const fieldType = typeof fieldConfig === "string" ? fieldConfig : "text";
+  const fieldType = (typeof fieldConfig === "object" ? fieldConfig.type : fieldConfig) || "text";
+  const isReadOnly = (typeof fieldConfig === "object" && fieldConfig.readOnly) ? "readonly" : "";
+
+  if (fieldType === "textarea") {
+    return `
+      <div>
+        <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
+        <textarea name="${field}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" ${isReadOnly}>${value ?? ""}</textarea>
+      </div>`;
+  }
+
   return `
     <div>
       <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
-      <input type="${fieldType}" name="${field}" value="${value ?? ""}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <input type="${fieldType}" name="${field}" value="${value ?? ""}" ${isReadOnly} class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadOnly ? 'bg-slate-100 text-slate-500' : ''}">
     </div>`;
 }
 
-// Global File Attachment Dynamic Generator
 window.addFlatFileItem = function (field) {
   const container = document.getElementById(`nested-container-${field}`);
   if (!container) return;
@@ -938,14 +933,12 @@ async function saveRecord(e) {
     reader.onerror = (error) => reject(error);
   });
 
-  // Extract non-file inputs
   for (const [key, value] of formData.entries()) {
     if (!key.endsWith("[]") && !(value instanceof File)) {
       payload[key] = value;
     }
   }
 
-  // Process File inputs to Base64
   const fileInputs = form.querySelectorAll('input[type="file"]');
   for (const input of fileInputs) {
     if (input.files?.length > 0) {
@@ -964,8 +957,18 @@ async function saveRecord(e) {
     }
   }
 
+  // --- Check for custom field override endpoint (e.g., updateField) ---
+  let customUpdateEndpoint = null;
+  if (editId && config.fieldTypes) {
+    Object.keys(config.fieldTypes).forEach((fKey) => {
+      if (typeof config.fieldTypes[fKey] === "object" && config.fieldTypes[fKey].updateField?.endpoint) {
+        customUpdateEndpoint = config.fieldTypes[fKey].updateField.endpoint;
+      }
+    });
+  }
+
   let targetUrl = editId
-    ? config.update || config.endpoint
+    ? customUpdateEndpoint || config.update || config.endpoint
     : config.create || config.endpoint;
 
   if (typeof targetUrl === "function") {
@@ -1010,32 +1013,25 @@ async function deleteRecord(id) {
   }
 }
 
-
 export function navigateAndFilter(targetModule, searchKey) {
-    // 1. Switch active nav button styling
-    document.querySelectorAll(".nav-btn").forEach(btn => {
-        btn.classList.remove("bg-slate-800");
-        if (btn.dataset.module === targetModule) {
-            btn.classList.add("bg-slate-800");
-        }
-    });
+  document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.classList.remove("bg-slate-800");
+    if (btn.dataset.module === targetModule) {
+      btn.classList.add("bg-slate-800");
+    }
+  });
 
-    // 2. Load module data
-    loadModule(targetModule).then(() => {
-        // 3. Populate search box & trigger filter
-        const searchBox = document.getElementById("searchBox");
-        if (searchBox) {
-            searchBox.value = searchKey;
-            filterTable(searchKey);
-        }
-    });
+  loadModule(targetModule).then(() => {
+    const searchBox = document.getElementById("searchBox");
+    if (searchBox) {
+      searchBox.value = searchKey;
+      filterTable(searchKey);
+    }
+  });
 }
 
-// Attach to window so dynamically generated inline onclick events can reach it
+// Global Bindings
 window.navigateAndFilter = navigateAndFilter;
-
-// Global Window Bindings for Dynamic Handlers
 window.editRecord = editRecord;
 window.deleteRecord = deleteRecord;
 window.showAboutModal = () => console.log("Displaying Modal for module:", currentModule);
-window.navigateAndFilter = navigateAndFilter;

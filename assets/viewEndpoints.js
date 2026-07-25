@@ -2,8 +2,10 @@ import express from "express";
 import {
   getUserMonitorsAndAssets,
   getUnassignedComputers , 
-    getUnassignedMonitors
+    getUnassignedMonitors , 
 } from "../database/view.js";
+
+import {createEmployeeForms} from "../database/form.js"
 
 const router = express.Router();
 
@@ -47,6 +49,18 @@ router.get("/unassigned-monitors", async (req, res) => {
         });
     }
 });
+
+
+// create a from based on the user info
+router.post("/" , async(req , res) => {
+    // if it has form add the form 
+    const body = req.body  
+    if(req.body.forms){
+        createEmployeeForms(body)
+    }
+
+    return res.status(201)
+})
 
 
 export default router;

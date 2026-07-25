@@ -1,6 +1,8 @@
 import express from "express";
 import * as Employee from "../database/employee.js";
 
+import { getAllForms } from "../database/form.js";
+
 const router = express.Router();
 
 /**
@@ -15,24 +17,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-/**
- * GET employee by ID
- */
-router.get("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const result = await Employee.getById(id);
-
-    if (!result) {
-      return res.status(404).json({ error: "Employee not found" });
-    }
-
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 /**
  * upsert employee (create or update)
@@ -55,20 +39,16 @@ router.post("/", async (req, res) => {
 
 
 
-/**
- * DELETE employee
- */
-router.delete("/:id", async (req, res) => {
+router.get('/forms' , async (req , res) => {
   try {
-    const { id } = req.params;
-
-    await Employee.remove(id);
-
-    res.json({ message: "Employee deleted" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const forms = await getAllForms()
+    res.json(forms)
   }
-});
+  catch(err){
+      res.status(500).json({error : err.message})
+  }
+
+})
 
 // forms end point 
 router.get("/forms/:id", async (req, res) => {
@@ -99,6 +79,41 @@ router.post("/forms/create", async (req, res) => {
  */
 router.get("/help", (req, res) => {
   res.send("Employee API is running. Use /api/employees");
+});
+
+
+/**
+ * DELETE employee
+ */
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await Employee.remove(id);
+
+    res.json({ message: "Employee deleted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET employee by ID
+ */
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await Employee.getById(id);
+
+    if (!result) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;
