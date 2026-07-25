@@ -93,7 +93,7 @@ app.use((req, res, next) => {
     }
 
     // Check if the URL explicitly targets your allowed asset types
-    if (urlPath.endsWith('.html') || urlPath.endsWith('.js') || urlPath.endsWith('.css') || urlPath.endsWith('.jpg') || urlPath.endsWith('.png') || urlPath.endsWith('.ico') || urlPath.endsWith('.pdf')) {
+    if (urlPath.endsWith('.html') || urlPath.endsWith('.js') || urlPath.endsWith('.css') || urlPath.endsWith('.jpg') || urlPath.endsWith('.png') || urlPath.endsWith('.ico') || urlPath.endsWith('.jpeg') || urlPath.endsWith('.pdf')) {
         // Map the URL path directly to your local file system root
         const filePath = path.join(__dirname, urlPath);
 

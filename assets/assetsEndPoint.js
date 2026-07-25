@@ -48,6 +48,7 @@ router.post("/", async (req, res) => {
     console.log("Received asset data:", req.body);
     const assetId = await upsertComputerAsset(req.body);
 
+
     res.json({
       success: true,
       assetId

@@ -113,11 +113,23 @@ export async function getAllEmployeeForms(employeeID){
 
 
 
-// upload a new form for an employee (Base64 version)
-export async function uploadEmployeeForm(employeeID, base64Data) {
-  // 1. Validate file size immediately (Base64 string length * 0.75 gives approx size in bytes)
+export async function uploadEmployeeForm(employeeID, base64Input) {
   console.log("Uploading form for employee ID:", employeeID);
-  const estimatedSize = base64Data.length * 0.75;
+
+  // 1. Normalize input to extract the raw Base64 string
+  let rawBase64 = base64Input;
+  if (Array.isArray(base64Input)) {
+    rawBase64 = base64Input[0]?.string || base64Input[0];
+  } else if (typeof base64Input === "object" && base64Input !== null) {
+    rawBase64 = base64Input.string || base64Input.file_path || base64Input;
+  }
+
+  if (typeof rawBase64 !== "string") {
+    throw new Error("Invalid base64 payload received. Expected a string.");
+  }
+
+  // 2. Validate file size (5MB limit)
+  const estimatedSize = rawBase64.length * 0.75;
   if (estimatedSize > 5 * 1024 * 1024) {
     throw new Error("File too large");
   }
@@ -125,48 +137,54 @@ export async function uploadEmployeeForm(employeeID, base64Data) {
   const timestamp = Date.now();
   const newFileName = `${employeeID}.${timestamp}.pdf`;
   const targetDir = 'public/forms';
-  const filePath = path.join(targetDir, newFileName);
+  const fullFilePath = path.join(targetDir, newFileName);
+  const relativeDbPath = path.join('forms', newFileName).replace(/\\/g, '/');
+
+  let fileWritten = false;
 
   try {
-    // 2. Ensure the directory exists
+    // 3. Write file to disk first
     await fs.promises.mkdir(targetDir, { recursive: true });
     
-    // 3. Remove metadata header (e.g., "data:image/png;base64,") if present
-    const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
-
-    // 4. Convert Base64 back to binary Buffer and write to disk
+    const cleanBase64 = rawBase64.replace(/^data:[^;]+;base64,/, "");
     const buffer = Buffer.from(cleanBase64, 'base64');
-    await fs.promises.writeFile(filePath, buffer);
+    await fs.promises.writeFile(fullFilePath, buffer);
+    fileWritten = true;
 
-  } catch (err) {
-    console.error("Error saving file from Base64:", err);
-    throw new Error("Failed to save file");
-  }
-
-  // 5. Insert into database 
-  try {
-    const result = await db.run(
-      `
-      INSERT INTO employee_forms (employee_id, file_path)
+    // 4. Insert dynamic record into employee_forms table
+    const query = `
+      INSERT INTO employee_forms (employee_id, file_path) 
       VALUES (?, ?)
-    `,
-      [employeeID, filePath]
-    );
-    return result.lastID;
-  } catch (err) {
-    console.error("Error inserting form record into database:", err);
+    `;
     
-    // 6. Reverse the file save if database insert fails
-    try {
-      await fs.promises.unlink(filePath);
-    } catch (unlinkErr) {
-      console.error("Error deleting file after database insert failure:", unlinkErr);
+    // Execute query (using run or statement execution based on your sqlite wrapper)
+    const result = await db.run(query, [employeeID, relativeDbPath]);
+
+    console.log(`Saved form ID ${result?.lastID} for employee ID ${employeeID}`);
+
+    return {
+      success: true,
+      formID: result?.lastID,
+      employeeID,
+      filePath: relativeDbPath
+    };
+
+  } catch (err) {
+    console.error("Error in uploadEmployeeForm:", err.message);
+
+    // Rollback: Clean up orphaned file on disk if DB insertion fails
+    if (fileWritten) {
+      try {
+        await fs.promises.unlink(fullFilePath);
+        console.log(`Cleaned up orphaned file: ${fullFilePath}`);
+      } catch (cleanupErr) {
+        console.error("Failed to delete orphaned file during rollback:", cleanupErr);
+      }
     }
 
-    throw new Error("Failed to insert form record into database");
+    throw new Error("Failed to save file and insert record");
   }
 }
-
 
 // delete a form for an employee
 export async function deleteEmployeeForm(formID) {

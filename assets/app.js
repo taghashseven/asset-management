@@ -3,6 +3,7 @@
    ========================================================================== */
 
 export const CONFIG = {
+  
   employees: {
     endpoint: "/api/employees",
     about: {
@@ -62,6 +63,14 @@ export const CONFIG = {
           urlField: "file_path"
         }
       },
+      // --- DYNAMIC SCALABLE LOOKUP DEFINITION ---
+      employee_id: {
+        type: "lookup",
+        searchEndpoint: "/api/employees",
+        searchKeys: ["email", "first_name", "last_name", "employee_id"],
+        targetField: "employee_id",
+        displayFormat: (item) => `${item.first_name || ''} ${item.last_name || ''} (${item.email || ''})`.trim()
+      },
       email: {
         type: "string",
         readOnly: true
@@ -73,13 +82,17 @@ export const CONFIG = {
   "computer-assets": {
     endpoint: "/api/assets",
     idField: "asset_id",
-    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location"],
+    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location" , "images"],
     fieldTypes: {
       status: ["Available", "Deployed", "In Repair", "Scrapped"],
       bitlocker_key: {
         type: "text",
         truncate: 15
-      } 
+      }   ,
+      images : {
+        type : "array" 
+      }
+      
     },
     customViewFile: null
   },
@@ -106,9 +119,13 @@ export const CONFIG = {
   monitors: {
     endpoint: "/api/monitors",
     idField: "monitor_id",
-    fields: ["asset_number", "serial_number", "brand", "model", "status"],
+    fields: ["asset_number", "serial_number", "brand", "model", "status" , "images"],
     fieldTypes: {
-      status: ["Available", "Deployed", "In Repair"]
+      status: ["Available", "Deployed", "In Repair"] , 
+      images : {
+        type : "array" , 
+        displayField: "image_path",
+      }
     },
     customViewFile: null
   },
@@ -137,8 +154,7 @@ export const CONFIG = {
           fieldTypes: { file_path: "file" }
         }
       }
-    },
-    standalone: false
+    }
   },
 
   printers: {
@@ -348,7 +364,7 @@ function renderColumnSelector() {
       const f = e.target.dataset.field;
       visibleFields = e.target.checked ? [...visibleFields, f] : visibleFields.filter((x) => x !== f);
       saveStorageConfiguration(currentModule);
-      renderRouter();
+      renderDefaultTable(filteredData, config);
     });
 
     itemWrapper.querySelector(".width-slider").addEventListener("input", (e) => {
@@ -357,7 +373,7 @@ function renderColumnSelector() {
       fieldWidths[f] = targetVal;
       itemWrapper.querySelector(".width-lbl").innerText = `${targetVal}px`;
       saveStorageConfiguration(currentModule);
-      renderRouter();
+      renderDefaultTable(filteredData, config);
     });
 
     dropdown.appendChild(itemWrapper);
@@ -516,17 +532,23 @@ export function renderDefaultTable(data = [], config = {}) {
   }
 
   const sampleRecord = data[0];
-  const headers = (Array.isArray(config.fields) && config.fields.length > 0)
+  const allHeaders = (Array.isArray(config.fields) && config.fields.length > 0)
     ? config.fields
     : Object.keys(sampleRecord);
 
+  // Filter headers to only display active/visible fields
+  const headers = allHeaders.filter((field) => visibleFields.includes(field));
+
   const fieldTypes = config.fieldTypes || {};
 
+  // Build Table Headers with Inline Width Styling
   const headerRowHTML = headers.map(header => {
     const title = header.replaceAll('_', ' ').toUpperCase();
-    return `<th class="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">${title}</th>`;
-  }).join('') + `<th class="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Actions</th>`;
+    const widthStyle = fieldWidths[header] ? `style="width: ${fieldWidths[header]}px;"` : '';
+    return `<th class="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200" ${widthStyle}>${title}</th>`;
+  }).join('') + `<th class="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200" style="width: 100px;">Actions</th>`;
 
+  // Build Table Data Rows matching filtered visible headers
   const dataRowsHTML = data.map((row) => {
     const primaryKey = config.idField || Object.keys(row)[0];
     const recordId = row[primaryKey];
@@ -742,22 +764,27 @@ export function filterTable(searchQuery) {
    FORM COMPONENT & FIELD BUILDERS
    ========================================================================== */
 
-export function generateFormFieldHTML(field, value = "", config = {}) {
+export function generateFormFieldHTML(field, value = "", config = {}, recordId = null) {
   const types = config.fieldTypes || {};
   const fieldConfig = types[field];
   const labelText = field.replaceAll("_", " ").toUpperCase();
 
+  // --- 1. ARRAY / NESTED IMAGE FIELD ---
   if (typeof fieldConfig === "object" && fieldConfig.type === "array") {
     const existingItems = Array.isArray(value) ? value : [];
     const displayField = fieldConfig.displayField || "file_path";
 
-    const itemsHTML = existingItems.map((val) => {
+    const itemsHTML = existingItems.map((val, index) => {
       const relativePath = typeof val === "object" ? val[displayField] : val;
       const fileName = String(relativePath || "").split("\\").pop().split("/").pop();
       const srcUrl = String(relativePath || "").startsWith("/") ? relativePath : `/${relativePath}`;
+      const uniqueRowId = `existing-file-${field}-${index}`;
+
+      // Escape quotes for safely passing inside inline JS
+      const safeFilePath = String(relativePath).replace(/'/g, "\\'");
 
       return `
-        <div class="nested-item-row bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-between gap-3 shadow-sm">
+        <div id="${uniqueRowId}" class="nested-item-row bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-between gap-3 shadow-sm">
           <div class="flex items-center gap-3 overflow-hidden">
             <a href="${srcUrl}" target="_blank" title="Click to view file">
               <img src="${srcUrl}" alt="${fileName}" class="w-12 h-12 object-cover rounded border border-slate-300 hover:opacity-80 transition cursor-pointer flex-shrink-0" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22 fill=%22%2394a3b8%22 viewBox=%220 0 16 16%22><path d=%22M14 3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12zM2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2z%22/><path d=%22M10.648 8.646a.5.5 0 0 1 .577-.093l3.777 1.947V14h-12v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z%22/></svg>';" />
@@ -767,7 +794,19 @@ export function generateFormFieldHTML(field, value = "", config = {}) {
               <span class="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block mt-0.5">Saved in DB</span>
             </div>
           </div>
-          <a href="${srcUrl}" target="_blank" class="text-xs text-blue-600 hover:underline flex-shrink-0 font-medium">View ↗</a>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <a href="${srcUrl}" target="_blank" class="text-xs text-blue-600 hover:underline font-medium">View ↗</a>
+            ${
+              recordId
+                ? `<button type="button" 
+                           onclick="deleteExistingFile('${currentModule}', '${field}', '${recordId}', '${safeFilePath}', '${uniqueRowId}')" 
+                           class="text-xs text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 p-1.5 rounded border border-rose-200 transition" 
+                           title="Delete from server">
+                     🗑️
+                   </button>`
+                : ''
+            }
+          </div>
         </div>`;
     }).join("");
 
@@ -783,9 +822,33 @@ export function generateFormFieldHTML(field, value = "", config = {}) {
       </div>`;
   }
 
+  // --- 2. SEARCHABLE LOOKUP FIELD ---
+  if (typeof fieldConfig === "object" && fieldConfig.type === "lookup") {
+    return `
+      <div class="relative lookup-container" data-field="${field}">
+        <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
+        <div class="relative">
+          <input 
+            type="text" 
+            id="lookup-input-${field}" 
+            placeholder="Type user email or name to search..." 
+            class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            autocomplete="off"
+          />
+          <input type="hidden" name="${field}" id="lookup-hidden-${field}" value="${value ?? ''}" />
+        </div>
+        <div 
+          id="lookup-results-${field}" 
+          class="hidden absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+        ></div>
+      </div>
+    `;
+  }
+
   const fieldType = (typeof fieldConfig === "object" ? fieldConfig.type : fieldConfig) || "text";
   const isReadOnly = (typeof fieldConfig === "object" && fieldConfig.readOnly) ? "readonly" : "";
 
+  // --- 3. TEXTAREA FIELD ---
   if (fieldType === "textarea") {
     return `
       <div>
@@ -794,11 +857,131 @@ export function generateFormFieldHTML(field, value = "", config = {}) {
       </div>`;
   }
 
+  // --- 4. STANDARD INPUT FIELD ---
   return `
     <div>
       <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
       <input type="${fieldType}" name="${field}" value="${value ?? ""}" ${isReadOnly} class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadOnly ? 'bg-slate-100 text-slate-500' : ''}">
     </div>`;
+}
+
+/**
+ * Controller to bind search behaviors and auto-filling logic to lookup input fields
+ */
+export function setupFormLookups(config, rowData = null) {
+  const lookupContainers = document.querySelectorAll(".lookup-container");
+
+  lookupContainers.forEach((container) => {
+    const fieldName = container.dataset.field;
+    const fieldConfig = config.fieldTypes?.[fieldName];
+    if (!fieldConfig) return;
+
+    const searchInput = container.querySelector(`#lookup-input-${fieldName}`);
+    const hiddenInput = container.querySelector(`#lookup-hidden-${fieldName}`);
+    const resultsContainer = container.querySelector(`#lookup-results-${fieldName}`);
+
+    let cache = null;
+
+    const loadCache = async () => {
+      if (!cache && fieldConfig.searchEndpoint) {
+        try {
+          const res = await fetch(fieldConfig.searchEndpoint);
+          cache = await res.json();
+        } catch (err) {
+          console.error("Failed to fetch lookup data:", err);
+        }
+      }
+      return cache;
+    };
+
+    // Pre-populate input label if editing an existing record
+    if (rowData && rowData[fieldName]) {
+      loadCache().then((dataset) => {
+        if (!dataset) return;
+        const match = dataset.find(x => String(x[fieldConfig.targetField]) === String(rowData[fieldName]));
+        if (match) {
+          searchInput.value = fieldConfig.displayFormat ? fieldConfig.displayFormat(match) : match[fieldConfig.targetField];
+        } else {
+          searchInput.value = rowData[fieldName];
+        }
+      });
+    }
+
+    // Load endpoint cache when user focuses input
+    searchInput.addEventListener("focus", async () => {
+      await loadCache();
+    });
+
+    // Handle real-time user query search
+    searchInput.addEventListener("input", async (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      const dataset = await loadCache();
+
+      if (!query || !dataset) {
+        resultsContainer.innerHTML = "";
+        resultsContainer.classList.add("hidden");
+        return;
+      }
+
+      const matches = dataset.filter((item) => {
+        return fieldConfig.searchKeys.some((k) =>
+          String(item[k] || "").toLowerCase().includes(query)
+        );
+      });
+
+      if (matches.length === 0) {
+        resultsContainer.innerHTML = `<div class="p-2.5 text-xs text-slate-400 font-medium">No matching records found</div>`;
+      } else {
+        resultsContainer.innerHTML = matches.map((item) => {
+          const label = fieldConfig.displayFormat
+            ? fieldConfig.displayFormat(item)
+            : item[fieldConfig.targetField];
+
+          return `
+            <div 
+              class="lookup-item p-2 hover:bg-blue-50 cursor-pointer text-xs border-b border-slate-100 last:border-b-0 text-slate-700 font-medium transition"
+              data-id="${item[fieldConfig.targetField]}"
+              data-email="${item.email || ''}"
+              data-label="${label}"
+            >
+              ${label}
+            </div>
+          `;
+        }).join("");
+      }
+
+      resultsContainer.classList.remove("hidden");
+    });
+
+    // Handle user selection from dropdown options
+    resultsContainer.addEventListener("click", (e) => {
+      const itemEl = e.target.closest(".lookup-item");
+      if (!itemEl) return;
+
+      const selectedId = itemEl.dataset.id;
+      const selectedEmail = itemEl.dataset.email;
+      const selectedLabel = itemEl.dataset.label;
+
+      hiddenInput.value = selectedId;
+      searchInput.value = selectedLabel;
+
+      // Auto-fill connected read-only inputs in form (e.g. email)
+      const form = container.closest("form");
+      if (form) {
+        const emailInput = form.querySelector('input[name="email"]');
+        if (emailInput) emailInput.value = selectedEmail;
+      }
+
+      resultsContainer.classList.add("hidden");
+    });
+
+    // Dismiss results on clicking outside
+    document.addEventListener("click", (e) => {
+      if (!container.contains(e.target)) {
+        resultsContainer.classList.add("hidden");
+      }
+    });
+  });
 }
 
 window.addFlatFileItem = function (field) {
@@ -879,6 +1062,7 @@ function openCreateForm() {
   if (recordForm) {
     recordForm.innerHTML = html;
     recordForm.onsubmit = saveRecord;
+    setupFormLookups(config);
   }
   openDrawer("Create Record");
 }
@@ -901,7 +1085,8 @@ function editRecord(id) {
           <input name="${field}" value="${row[field] ?? ""}" readonly class="w-full bg-slate-100 border border-slate-200 rounded-lg p-2 text-sm text-slate-400 font-mono focus:outline-none">
         </div>`;
     } else {
-      html += generateFormFieldHTML(field, row[field], config);
+      // Pass 'id' as 4th parameter
+      html += generateFormFieldHTML(field, row[field], config, id);
     }
   });
 
@@ -911,9 +1096,10 @@ function editRecord(id) {
   if (recordForm) {
     recordForm.innerHTML = html;
     recordForm.onsubmit = saveRecord;
+    setupFormLookups(config, row);
   }
   openDrawer("Edit Record");
-}
+} 
 
 /* ==========================================================================
    ATOMIC CRUD ACTION HANDLERS
@@ -1029,6 +1215,48 @@ export function navigateAndFilter(targetModule, searchKey) {
     }
   });
 }
+
+/* ==========================================================================
+   IMAGE/FILE DELETION HANDLER
+   ========================================================================== */
+
+export async function deleteExistingFile(moduleName, field, recordId, fileIdentifier, elementId) {
+  if (!confirm("Are you sure you want to delete this file permanently?")) return;
+
+  const config = CONFIG[moduleName];
+  const fieldConfig = config?.fieldTypes?.[field];
+  const deleteEndpoint = fieldConfig?.deleteEndpoint || `${config?.endpoint}/delete-file`;
+
+  try {
+    const response = await fetch(deleteEndpoint, {
+      method: "POST", // or "DELETE" depending on your backend API contract
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        [config.idField]: recordId,
+        field: field,
+        filePath: fileIdentifier
+      })
+    });
+
+    if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+
+    showToast("File deleted successfully!", "success");
+
+    // Remove item UI element from drawer
+    const rowEl = document.getElementById(elementId);
+    if (rowEl) rowEl.remove();
+
+    // Reload module background data to keep UI synced
+    loadModule(currentModule, true, activePrinterId);
+
+  } catch (err) {
+    console.error("Failed to delete file:", err);
+    showToast(`Failed to delete file: ${err.message}`, "error");
+  }
+}
+
+// Bind to window for inline onclick execution
+window.deleteExistingFile = deleteExistingFile;
 
 // Global Bindings
 window.navigateAndFilter = navigateAndFilter;
