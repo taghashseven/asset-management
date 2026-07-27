@@ -1,90 +1,169 @@
-// apiDatabaseView.js
-
 export function render(container) {
     container.innerHTML = `
-        <div class="max-w-7xl mx-auto space-y-6">
+        <div class="p-4 md:p-6 space-y-6 bg-slate-100 min-h-screen">
             
-            <!-- SQL Query Input Section -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div class="bg-slate-900 text-white px-5 py-3 flex items-center justify-between border-b border-slate-800">
-                    <div class="flex items-center gap-2">
-                        <span class="text-blue-400 font-mono text-lg">⚡</span>
-                        <h3 class="font-bold text-sm tracking-wide">SQL Query Console</h3>
+            <!-- Dashboard Header -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-500/20">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8-1.79-8-4"></path></svg>
                     </div>
-                    <!-- Quick Helper Shortcuts -->
-                    <div class="flex items-center gap-2">
-                        <button id="btnShortcutSelect" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-700 font-mono transition">SELECT *</button>
-                        <button id="btnShortcutClear" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-700 font-mono transition">Clear</button>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 tracking-tight">Database Explorer & Single-Table ER Visualizer</h2>
+                        <p id="dbSummarySubtitle" class="text-xs text-slate-500">Connecting to database engine...</p>
                     </div>
-                </div>
-                
-                <div class="p-4 bg-slate-950">
-                    <textarea 
-                        id="sqlQueryInput" 
-                        rows="5" 
-                        class="w-full bg-slate-950 text-emerald-400 font-mono text-sm p-3 focus:outline-none resize-y placeholder-slate-700"
-                        placeholder="-- Write your SQL query here&#10;SELECT * FROM employees LIMIT 10;"
-                        spellcheck="false"
-                    ></textarea>
                 </div>
 
-                <div class="bg-slate-50 px-5 py-3 border-t border-slate-200 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Target Endpoint:</span>
-                        <code class="text-xs bg-slate-200 text-slate-700 px-2 py-1 rounded font-mono">/api/database/query</code>
+                <!-- View Switcher & Actions -->
+                <div class="flex items-center gap-3">
+                    <div class="bg-slate-100 p-1 rounded-xl border border-slate-200 flex items-center gap-1">
+                        <button id="tabBtnConsole" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-600 shadow-sm">
+                            💻 SQL Console & Data
+                        </button>
+                        <button id="tabBtnVisualizer" class="px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900">
+                            🎯 Focused ER Diagram
+                        </button>
                     </div>
-                    <button 
-                        id="btnExecuteQuery" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 shadow-sm transition active:scale-95"
-                    >
-                        <span>Run Query</span>
-                        <span class="text-xs opacity-75 font-mono">(Ctrl + Enter)</span>
+
+                    <button id="btnRefreshSchema" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300 font-semibold transition flex items-center gap-1.5">
+                        <span>🔄</span> Refresh
                     </button>
                 </div>
             </div>
 
-            <!-- Query Metadata / Status Bar -->
-            <div id="queryMetaContainer" class="hidden flex items-center justify-between bg-white px-5 py-3 rounded-xl border border-slate-200 text-xs font-medium">
-                <div class="flex items-center gap-4">
-                    <span id="queryStatusBadge" class="px-2.5 py-1 rounded-full font-bold"></span>
-                    <span id="queryExecutionTime" class="text-slate-500 font-mono"></span>
+            <!-- VIEW 1: SQL Console & Data Explorer -->
+            <div id="viewConsole" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Left Sidebar: Tables Browser -->
+                <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[780px] overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-sm text-slate-700">Schema Explorer</h3>
+                            <span id="tableCountBadge" class="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-mono">0</span>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="tableSearchInput" 
+                            placeholder="Filter tables..." 
+                            class="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+                        />
+                    </div>
+
+                    <div id="tablesContainer" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-2 space-y-1">
+                        <div class="p-8 text-center text-slate-400 text-xs">Fetching database schema...</div>
+                    </div>
                 </div>
-                <div id="queryRowCount" class="text-slate-600 font-semibold"></div>
+
+                <!-- Right Pane: SQL Console + Dynamic Results View -->
+                <div class="lg:col-span-9 space-y-6">
+                    <div class="bg-slate-950 rounded-2xl shadow-lg border border-slate-800 overflow-hidden">
+                        <div class="bg-slate-900/90 px-5 py-3 flex items-center justify-between border-b border-slate-800">
+                            <div class="flex items-center gap-2">
+                                <span class="text-blue-400 font-mono text-base">⚡</span>
+                                <h3 class="font-bold text-xs uppercase tracking-wider text-slate-300 font-mono">SQL Execution Console</h3>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button id="btnShortcutSelect" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-mono transition">SELECT * FROM computer_assets</button>
+                                <button id="btnShortcutClear" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 px-2.5 py-1 rounded-lg border border-slate-700/60 font-mono transition">Clear</button>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 bg-slate-950">
+                            <textarea 
+                                id="sqlQueryInput" 
+                                rows="4" 
+                                class="w-full bg-transparent text-emerald-400 font-mono text-sm leading-relaxed p-2 focus:outline-none resize-y placeholder-slate-700"
+                                placeholder="-- Select a table on the left or write custom SQL queries...&#10;SELECT * FROM computer_assets WHERE status = 'Available';"
+                                spellcheck="false"
+                            ></textarea>
+                        </div>
+
+                        <div class="bg-slate-900/50 px-5 py-3 border-t border-slate-800/80 flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-slate-400">
+                                <span class="text-[11px] font-mono text-slate-500 uppercase">Endpoint:</span>
+                                <code class="text-xs text-blue-400 font-mono bg-blue-950/50 px-2 py-0.5 rounded border border-blue-900/50">/api/database-api/query</code>
+                            </div>
+                            <button 
+                                id="btnExecuteQuery" 
+                                class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold tracking-wide flex items-center gap-2 shadow-lg shadow-blue-600/30 transition active:scale-95"
+                            >
+                                <span>RUN QUERY</span>
+                                <span class="text-[10px] opacity-75 font-mono">(Ctrl + Enter)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="queryMetaContainer" class="hidden flex items-center justify-between bg-white px-5 py-3 rounded-xl border border-slate-200 text-xs font-medium shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <span id="queryStatusBadge" class="px-2.5 py-0.5 rounded-full font-bold"></span>
+                            <span id="queryExecutionTime" class="text-slate-500 font-mono"></span>
+                        </div>
+                        <div id="queryRowCount" class="text-slate-700 font-semibold font-mono"></div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[420px]">
+                        <div class="bg-slate-50/80 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <h4 class="font-bold text-slate-700 text-xs uppercase tracking-wider">Results Explorer</h4>
+                                <span id="activeTableLabel" class="text-xs text-blue-600 font-mono font-semibold"></span>
+                            </div>
+                            <button id="toggleViewBtn" class="text-xs text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1 rounded-lg font-medium shadow-sm transition">
+                                Switch to Raw JSON
+                            </button>
+                        </div>
+
+                        <div id="resultTableWrapper" class="overflow-auto flex-1 max-h-[480px]">
+                            <div class="p-16 text-center text-slate-400 space-y-3">
+                                <div class="text-4xl">🗄️</div>
+                                <p class="text-xs font-medium text-slate-500">Select a table from the left or run a custom SQL query to display database records.</p>
+                            </div>
+                        </div>
+
+                        <div id="resultJsonWrapper" class="hidden overflow-auto flex-1 max-h-[480px] bg-slate-900 p-4">
+                            <pre id="jsonViewer" class="text-xs text-emerald-400 font-mono whitespace-pre-wrap"></pre>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Query Results Section -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[350px]">
-                <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-                    <h4 class="font-bold text-slate-700 text-sm">Query Results</h4>
-                    <div class="flex gap-2">
-                        <button id="toggleViewBtn" class="text-xs text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1 rounded-md font-medium transition">
-                            Switch to Raw JSON
-                        </button>
+            <!-- VIEW 2: Single Table Focused ER Diagram Visualizer -->
+            <div id="viewVisualizer" class="hidden relative bg-slate-900 border border-slate-800 rounded-2xl shadow-xl h-[780px] overflow-hidden">
+                <div class="absolute top-4 left-4 z-20 bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 shadow-lg backdrop-blur flex items-center gap-3">
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">Single Table ER Focus</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Showing direct relationships only</p>
+                    </div>
+                    <div class="border-l border-slate-700 pl-3">
+                        <label class="text-[10px] text-slate-400 uppercase font-mono block mb-1">Select Focus Table:</label>
+                        <select id="focusTableSelect" class="bg-slate-800 text-blue-400 text-xs font-mono font-bold border border-slate-700 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <!-- Populated dynamically -->
+                        </select>
                     </div>
                 </div>
 
-                <!-- Table View Container -->
-                <div id="resultTableWrapper" class="overflow-auto flex-1 max-h-[500px]">
-                    <div class="p-12 text-center text-slate-400 space-y-2">
-                        <div class="text-3xl">🔍</div>
-                        <p class="text-sm font-medium">Run a SQL query above to view standard response tables.</p>
-                    </div>
-                </div>
+                <div id="erCanvasViewport" class="relative w-full h-full overflow-auto">
+                    <!-- SVG Overlay Canvas for Connectors -->
+                    <svg id="erSvgCanvas" class="absolute inset-0 pointer-events-none z-0 min-w-full min-h-full">
+                        <defs>
+                            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" />
+                            </marker>
+                        </defs>
+                    </svg>
 
-                <!-- Raw JSON Container (Initially Hidden) -->
-                <div id="resultJsonWrapper" class="hidden overflow-auto flex-1 max-h-[500px] bg-slate-900 p-4">
-                    <pre id="jsonViewer" class="text-xs text-blue-300 font-mono whitespace-pre-wrap"></pre>
+                    <!-- Dynamic Container for Draggable Table Nodes -->
+                    <div id="erNodesContainer" class="relative z-10 p-8 min-w-full min-h-full"></div>
                 </div>
             </div>
 
         </div>
     `;
 
-    // Internal State Management
-    let currentData = null;
+    // State Variables
+    let currentSchemaData = null;
+    let selectedFocusTable = null;
     let isJsonView = false;
 
-    // DOM References
+    // DOM Elements
     const queryInput = container.querySelector("#sqlQueryInput");
     const executeBtn = container.querySelector("#btnExecuteQuery");
     const metaContainer = container.querySelector("#queryMetaContainer");
@@ -95,25 +174,76 @@ export function render(container) {
     const jsonWrapper = container.querySelector("#resultJsonWrapper");
     const jsonViewer = container.querySelector("#jsonViewer");
     const toggleViewBtn = container.querySelector("#toggleViewBtn");
+    const tableSearchInput = container.querySelector("#tableSearchInput");
+    const activeTableLabel = container.querySelector("#activeTableLabel");
+    const tablesContainer = container.querySelector("#tablesContainer");
+    const tableCountBadge = container.querySelector("#tableCountBadge");
+    const dbSummarySubtitle = container.querySelector("#dbSummarySubtitle");
+    const btnRefreshSchema = container.querySelector("#btnRefreshSchema");
 
-    // Event Listeners
-    executeBtn.addEventListener("click", executeQuery);
-    
-    // Keyboard Shortcut (Ctrl + Enter / Cmd + Enter to Run Query)
-    queryInput.addEventListener("keydown", (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-            e.preventDefault();
-            executeQuery();
+    // Views & Navigation
+    const tabBtnConsole = container.querySelector("#tabBtnConsole");
+    const tabBtnVisualizer = container.querySelector("#tabBtnVisualizer");
+    const viewConsole = container.querySelector("#viewConsole");
+    const viewVisualizer = container.querySelector("#viewVisualizer");
+    const erSvgCanvas = container.querySelector("#erSvgCanvas");
+    const erNodesContainer = container.querySelector("#erNodesContainer");
+    const erCanvasViewport = container.querySelector("#erCanvasViewport");
+    const focusTableSelect = container.querySelector("#focusTableSelect");
+
+    // Initial Load
+    loadSchemaSummary();
+
+    // Event Handlers for Navigation Tabs
+    tabBtnConsole.addEventListener("click", () => {
+        tabBtnConsole.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-600 shadow-sm";
+        tabBtnVisualizer.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900";
+        viewConsole.classList.remove("hidden");
+        viewVisualizer.classList.add("hidden");
+    });
+
+    tabBtnVisualizer.addEventListener("click", () => {
+        tabBtnVisualizer.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-600 shadow-sm";
+        tabBtnConsole.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900";
+        viewConsole.classList.add("hidden");
+        viewVisualizer.classList.remove("hidden");
+        
+        if (currentSchemaData) {
+            requestAnimationFrame(() => renderFocusedErDiagram());
         }
     });
 
+    focusTableSelect.addEventListener("change", (e) => {
+        selectedFocusTable = e.target.value;
+        renderFocusedErDiagram();
+    });
+
+    btnRefreshSchema.addEventListener("click", loadSchemaSummary);
+    executeBtn.addEventListener("click", executeSqlQuery);
+
+    queryInput.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            executeSqlQuery();
+        }
+    });
+
+    tableSearchInput.addEventListener("input", (e) => {
+        const val = e.target.value.toLowerCase();
+        container.querySelectorAll(".btn-table-item").forEach(item => {
+            const tableName = item.getAttribute("data-table").toLowerCase();
+            item.style.display = tableName.includes(val) ? "flex" : "none";
+        });
+    });
+
     container.querySelector("#btnShortcutSelect").addEventListener("click", () => {
-        queryInput.value = "SELECT * FROM employees LIMIT 50;";
+        queryInput.value = "SELECT * FROM computer_assets LIMIT 50;";
         queryInput.focus();
     });
 
     container.querySelector("#btnShortcutClear").addEventListener("click", () => {
         queryInput.value = "";
+        activeTableLabel.innerText = "";
         queryInput.focus();
     });
 
@@ -130,25 +260,363 @@ export function render(container) {
         }
     });
 
-    // Core Execution Logic
-    async function executeQuery() {
+    // Fetch Database Schema
+    async function loadSchemaSummary() {
+        tablesContainer.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading schema...</div>`;
+        
+        try {
+            const response = await fetch("/api/database-api");
+            if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch schema.`);
+            
+            currentSchemaData = await response.json();
+            renderSidebarSchema(currentSchemaData);
+            populateFocusDropdown(currentSchemaData);
+            
+            if (!viewVisualizer.classList.contains("hidden")) {
+                renderFocusedErDiagram();
+            }
+        } catch (err) {
+            tablesContainer.innerHTML = `
+                <div class="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl m-2">
+                    <strong>Schema Load Error:</strong><br/>${err.message}
+                </div>`;
+            dbSummarySubtitle.innerText = "Failed to load database schema.";
+        }
+    }
+
+    function populateFocusDropdown(summaryData) {
+        const tables = getNormalizedTablesList(summaryData);
+        focusTableSelect.innerHTML = tables.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+        if (tables.length > 0 && !selectedFocusTable) {
+            selectedFocusTable = tables[0].name;
+        }
+    }
+
+    function getNormalizedTablesList(summaryData) {
+        const tablesObj = summaryData.tables || {};
+        if (Array.isArray(tablesObj)) return tablesObj;
+        return Object.keys(tablesObj).map(key => ({
+            name: key,
+            columns: tablesObj[key].columns || []
+        }));
+    }
+
+    // Build Sidebar Table List
+    function renderSidebarSchema(summaryData) {
+        const tables = getNormalizedTablesList(summaryData);
+        tableCountBadge.innerText = tables.length;
+        dbSummarySubtitle.innerText = `SQLite Database • ${tables.length} Tables Connected`;
+
+        if (tables.length === 0) {
+            tablesContainer.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">No tables returned from schema.</div>`;
+            return;
+        }
+
+        tablesContainer.innerHTML = tables.map(item => {
+            return `
+                <button 
+                    data-table="${item.name}" 
+                    class="btn-table-item w-full text-left p-2.5 rounded-xl hover:bg-blue-50/80 transition group flex items-center justify-between border border-transparent hover:border-blue-100"
+                >
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="text-base group-hover:scale-110 transition-transform">📄</span>
+                        <div class="truncate">
+                            <div class="text-xs font-semibold text-slate-700 font-mono group-hover:text-blue-600 truncate">${item.name}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">${(item.columns || []).length} column(s)</div>
+                        </div>
+                    </div>
+                    <span class="text-[10px] text-blue-600 font-mono opacity-0 group-hover:opacity-100 transition-opacity">FETCH</span>
+                </button>
+            `;
+        }).join('');
+
+        container.querySelectorAll(".btn-table-item").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const tableName = btn.getAttribute("data-table");
+                queryInput.value = `SELECT * FROM ${tableName} LIMIT 100;`;
+                activeTableLabel.innerText = `[${tableName}]`;
+                selectedFocusTable = tableName;
+                focusTableSelect.value = tableName;
+                fetchTableContent(tableName);
+            });
+        });
+    }
+
+    // Single-Table Focused ER Diagram Renderer
+    function renderFocusedErDiagram() {
+        erNodesContainer.innerHTML = "";
+        if (!currentSchemaData) return;
+
+        const allTables = getNormalizedTablesList(currentSchemaData);
+        const focusTableObj = allTables.find(t => t.name === selectedFocusTable);
+
+        if (!focusTableObj) {
+            erNodesContainer.innerHTML = `<div class="text-slate-400 text-xs text-center mt-20">Select a table to view its relationship diagram.</div>`;
+            return;
+        }
+
+        // Identify Related Tables (Outbound FKs & Inbound Foreign References)
+        const relatedTables = [];
+        const relationships = []; // Store relation metadata
+
+        allTables.forEach(otherTbl => {
+            if (otherTbl.name === focusTableObj.name) return;
+
+            let isRelated = false;
+
+            // Check if focus table references other table
+            (focusTableObj.columns || []).forEach(col => {
+                const colName = typeof col === "string" ? col : (col.name || "");
+                const targetSingular = otherTbl.name.replace(/s$/, "");
+                if (colName === `${targetSingular}_id` || (colName === "serial_number" && otherTbl.name === "computer_assets")) {
+                    isRelated = true;
+                    relationships.push({ from: focusTableObj.name, to: otherTbl.name, key: colName });
+                }
+            });
+
+            // Check if other table references focus table
+            (otherTbl.columns || []).forEach(col => {
+                const colName = typeof col === "string" ? col : (col.name || "");
+                const focusSingular = focusTableObj.name.replace(/s$/, "");
+                if (colName === `${focusSingular}_id` || (colName === "serial_number" && focusTableObj.name === "computer_assets")) {
+                    isRelated = true;
+                    relationships.push({ from: otherTbl.name, to: focusTableObj.name, key: colName });
+                }
+            });
+
+            if (isRelated && !relatedTables.some(rt => rt.name === otherTbl.name)) {
+                relatedTables.push(otherTbl);
+            }
+        });
+
+        // Compute Radial Layout (Focus Center + Circle of Relatives)
+        const viewportWidth = erCanvasViewport.clientWidth || 900;
+        const viewportHeight = erCanvasViewport.clientHeight || 700;
+
+        const centerX = Math.max(350, viewportWidth / 2 - 130);
+        const centerY = Math.max(250, viewportHeight / 2 - 140);
+        const radius = 320;
+
+        // Render Center Node (Focus Table)
+        renderTableCard(focusTableObj, centerX, centerY, true);
+
+        // Render Peripheral Nodes
+        relatedTables.forEach((relTbl, idx) => {
+            const angle = (2 * Math.PI * idx) / relatedTables.length;
+            const px = centerX + radius * Math.cos(angle);
+            const py = centerY + radius * Math.sin(angle);
+
+            renderTableCard(relTbl, px, py, false);
+        });
+
+        const activeTableSet = [focusTableObj, ...relatedTables];
+        
+        // Attach Drag events to all rendered nodes
+        activeTableSet.forEach(tbl => {
+            const el = container.querySelector(`#node-${tbl.name}`);
+            if (el) makeDraggable(el, relationships);
+        });
+
+        syncCanvasSizeAndRedraw(relationships);
+    }
+
+    // Helper to render individual table card
+    function renderTableCard(tbl, posX, posY, isFocus) {
+        const node = document.createElement("div");
+        node.id = `node-${tbl.name}`;
+        node.setAttribute("data-table-name", tbl.name);
+        
+        const borderClass = isFocus ? "border-2 border-blue-500 shadow-blue-500/20 ring-4 ring-blue-500/10" : "border border-slate-700 hover:border-slate-500";
+        const headerBg = isFocus ? "bg-blue-900/40 border-blue-500/50" : "bg-slate-900 border-slate-700";
+
+        node.className = `absolute bg-slate-800/95 ${borderClass} rounded-xl shadow-2xl w-[260px] overflow-hidden cursor-move transition-all select-none`;
+        node.style.left = `${posX}px`;
+        node.style.top = `${posY}px`;
+
+        const columnsHtml = (tbl.columns || []).map(c => {
+            const colName = typeof c === "string" ? c : (c.name || c.cid);
+            const colType = c.type ? `<span class="text-[10px] text-slate-500 font-mono">${c.type}</span>` : '';
+            const isPk = c.pk || colName.endsWith("_id") || colName === "id";
+            const isFk = colName.includes("_id") && colName !== `${tbl.name.replace(/s$/, '')}_id` && colName !== "asset_id";
+
+            let keyBadge = '';
+            if (isPk) keyBadge = `<span class="text-[9px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded font-mono font-bold">PK</span>`;
+            else if (isFk) keyBadge = `<span class="text-[9px] bg-blue-500/20 text-blue-400 px-1 py-0.2 rounded font-mono font-bold">FK</span>`;
+
+            return `
+                <div class="flex items-center justify-between text-xs px-3 py-1.5 border-b border-slate-800/60 hover:bg-slate-700/30">
+                    <div class="flex items-center gap-1.5 truncate">
+                        ${keyBadge}
+                        <span class="font-mono ${isPk ? 'text-amber-200 font-semibold' : (isFk ? 'text-blue-300' : 'text-slate-300')} truncate">${colName}</span>
+                    </div>
+                    ${colType}
+                </div>
+            `;
+        }).join('');
+
+        node.innerHTML = `
+            <div class="${headerBg} border-b px-3 py-2 flex items-center justify-between">
+                <div class="flex items-center gap-1.5 truncate">
+                    ${isFocus ? '<span class="text-xs">🎯</span>' : ''}
+                    <span class="font-mono text-xs font-bold ${isFocus ? 'text-blue-300' : 'text-slate-300'} truncate">${tbl.name}</span>
+                </div>
+                <span class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">${(tbl.columns || []).length} cols</span>
+            </div>
+            <div class="max-h-52 overflow-y-auto divide-y divide-slate-800">
+                ${columnsHtml || '<div class="p-3 text-[11px] text-slate-500 italic">No columns detected</div>'}
+            </div>
+        `;
+
+        erNodesContainer.appendChild(node);
+    }
+
+    // Calculates dynamic bounding anchor edges
+    function getCardBounds(node) {
+        return {
+            x: node.offsetLeft,
+            y: node.offsetTop,
+            w: node.offsetWidth,
+            h: node.offsetHeight,
+            left: { x: node.offsetLeft, y: node.offsetTop + node.offsetHeight / 2, dir: "left" },
+            right: { x: node.offsetLeft + node.offsetWidth, y: node.offsetTop + node.offsetHeight / 2, dir: "right" },
+            top: { x: node.offsetLeft + node.offsetWidth / 2, y: node.offsetTop, dir: "top" },
+            bottom: { x: node.offsetLeft + node.offsetWidth / 2, y: node.offsetTop + node.offsetHeight, dir: "bottom" }
+        };
+    }
+
+    function getClosestAnchorPair(nodeA, nodeB) {
+        const boundsA = getCardBounds(nodeA);
+        const boundsB = getCardBounds(nodeB);
+
+        const anchorsA = [boundsA.left, boundsA.right, boundsA.top, boundsA.bottom];
+        const anchorsB = [boundsB.left, boundsB.right, boundsB.top, boundsB.bottom];
+
+        let minDistance = Infinity;
+        let bestPair = { start: anchorsA[0], end: anchorsB[0] };
+
+        anchorsA.forEach(a => {
+            anchorsB.forEach(b => {
+                const dist = Math.hypot(b.x - a.x, b.y - a.y);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    bestPair = { start: a, end: b };
+                }
+            });
+        });
+
+        return bestPair;
+    }
+
+    // Draw Connector Lines between focused table & relatives
+    function drawAdaptiveRelationships(relationships) {
+        const markers = erSvgCanvas.querySelector("defs");
+        erSvgCanvas.innerHTML = "";
+        if (markers) erSvgCanvas.appendChild(markers);
+
+        relationships.forEach(rel => {
+            const sourceNode = container.querySelector(`#node-${rel.from}`);
+            const targetNode = container.querySelector(`#node-${rel.to}`);
+
+            if (sourceNode && targetNode) {
+                const { start, end } = getClosestAnchorPair(sourceNode, targetNode);
+                drawAdaptiveBezier(start, end);
+            }
+        });
+    }
+
+    function drawAdaptiveBezier(start, end) {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const dx = Math.abs(end.x - start.x) * 0.5;
+        const dy = Math.abs(end.y - start.y) * 0.5;
+
+        let cp1x = start.x, cp1y = start.y;
+        let cp2x = end.x, cp2y = end.y;
+
+        const offset = Math.max(35, Math.min(dx, dy));
+
+        if (start.dir === "left") cp1x -= offset;
+        else if (start.dir === "right") cp1x += offset;
+        else if (start.dir === "top") cp1y -= offset;
+        else if (start.dir === "bottom") cp1y += offset;
+
+        if (end.dir === "left") cp2x -= offset;
+        else if (end.dir === "right") cp2x += offset;
+        else if (end.dir === "top") cp2y -= offset;
+        else if (end.dir === "bottom") cp2y += offset;
+
+        const dStr = `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
+
+        path.setAttribute("d", dStr);
+        path.setAttribute("stroke", "#3b82f6");
+        path.setAttribute("stroke-width", "2.5");
+        path.setAttribute("stroke-dasharray", "5 4");
+        path.setAttribute("fill", "none");
+        path.setAttribute("marker-end", "url(#arrow)");
+        path.setAttribute("opacity", "0.9");
+
+        erSvgCanvas.appendChild(path);
+    }
+
+    function syncCanvasSizeAndRedraw(relationships) {
+        const nodes = container.querySelectorAll("[id^='node-']");
+        let maxX = erCanvasViewport.clientWidth;
+        let maxY = erCanvasViewport.clientHeight;
+
+        nodes.forEach(node => {
+            const right = node.offsetLeft + node.offsetWidth + 80;
+            const bottom = node.offsetTop + node.offsetHeight + 80;
+            if (right > maxX) maxX = right;
+            if (bottom > maxY) maxY = bottom;
+        });
+
+        erSvgCanvas.setAttribute("width", `${maxX}px`);
+        erSvgCanvas.setAttribute("height", `${maxY}px`);
+        erNodesContainer.style.width = `${maxX}px`;
+        erNodesContainer.style.height = `${maxY}px`;
+
+        drawAdaptiveRelationships(relationships);
+    }
+
+    function makeDraggable(element, relationships) {
+        let offsetX = 0, offsetY = 0, isDragging = false;
+
+        element.addEventListener("mousedown", (e) => {
+            if (e.target.closest('.overflow-y-auto')) return;
+            isDragging = true;
+            offsetX = e.clientX - element.offsetLeft;
+            offsetY = e.clientY - element.offsetTop;
+            element.classList.add("z-30", "ring-2", "ring-blue-500");
+        });
+
+        document.addEventListener("mousemove", (e) => {
+            if (!isDragging) return;
+            const newX = Math.max(10, e.clientX - offsetX);
+            const newY = Math.max(10, e.clientY - offsetY);
+
+            element.style.left = `${newX}px`;
+            element.style.top = `${newY}px`;
+
+            syncCanvasSizeAndRedraw(relationships);
+        });
+
+        document.addEventListener("mouseup", () => {
+            if (isDragging) {
+                isDragging = false;
+                element.classList.remove("z-30", "ring-2", "ring-blue-500");
+            }
+        });
+    }
+
+    // Execute Custom Query
+    async function executeSqlQuery() {
         const queryText = queryInput.value.trim();
         if (!queryText) return;
 
-        // UI Loading State
-        executeBtn.disabled = true;
-        executeBtn.classList.add("opacity-50", "cursor-not-allowed");
-        tableWrapper.innerHTML = `
-            <div class="p-12 text-center text-slate-500 space-y-3">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-                <p class="text-sm font-medium">Executing SQL query against database engine...</p>
-            </div>`;
-
+        setLoadingState("Executing SQL query...");
         const startTime = performance.now();
 
         try {
-            // Adjust the fetch URL and payload key to match your API backend specification
-            const response = await fetch("/api/database/query", {
+            const response = await fetch("/api/database-api/query", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query: queryText })
@@ -156,78 +624,115 @@ export function render(container) {
 
             const endTime = performance.now();
             const executionDuration = (endTime - startTime).toFixed(2);
-            
             const data = await response.json();
-            currentData = data;
 
-            // Render Meta Header Status
-            metaContainer.classList.remove("hidden");
-            executionTimeEl.innerText = `Duration: ${executionDuration} ms`;
-
-            if (!response.ok) {
-                throw new Error(data.message || data.error || `HTTP ${response.status} execution failure.`);
-            }
-
-            // Success Metadata Rendering
-            statusBadge.className = "px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300";
-            statusBadge.innerText = `SUCCESS (${response.status})`;
-
-            // Support for arrays of results or custom data key envelopes
-            const resultList = Array.isArray(data) ? data : (data.results || data.rows || []);
-            rowCountEl.innerText = `${resultList.length} Row(s) returned`;
-
-            // Render Results Engine
-            renderTable(resultList);
-            jsonViewer.textContent = JSON.stringify(data, null, 2);
-
+            handleApiResponse(response, data, executionDuration);
         } catch (err) {
-            metaContainer.classList.remove("hidden");
-            statusBadge.className = "px-2.5 py-1 rounded-full font-bold bg-rose-100 text-rose-800 border border-rose-300";
-            statusBadge.innerText = "ERROR";
-            rowCountEl.innerText = "0 Rows returned";
-
-            tableWrapper.innerHTML = `
-                <div class="p-8 bg-rose-50 border-l-4 border-rose-500 text-rose-800 m-4 rounded-r-lg space-y-1">
-                    <div class="font-bold text-sm">Query Execution Error</div>
-                    <div class="text-xs font-mono break-all">${err.message}</div>
-                </div>`;
-            jsonViewer.textContent = JSON.stringify({ error: err.message }, null, 2);
-        } finally {
-            executeBtn.disabled = false;
-            executeBtn.classList.remove("opacity-50", "cursor-not-allowed");
+            handleApiError(err.message);
         }
     }
 
-    // Dynamic SQL Response Table Builder
+    // Fetch Table Content
+    async function fetchTableContent(tableName) {
+        setLoadingState(`Fetching data for '${tableName}'...`);
+        const startTime = performance.now();
+
+        try {
+            const response = await fetch("/api/database-api/table", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tableName })
+            });
+
+            const endTime = performance.now();
+            const executionDuration = (endTime - startTime).toFixed(2);
+            const data = await response.json();
+
+            handleApiResponse(response, data, executionDuration);
+        } catch (err) {
+            handleApiError(err.message);
+        }
+    }
+
+    // Utilities
+    function setLoadingState(message) {
+        executeBtn.disabled = true;
+        executeBtn.classList.add("opacity-50", "cursor-not-allowed");
+        
+        tableWrapper.innerHTML = `
+            <div class="p-16 text-center text-slate-500 space-y-3">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+                <p class="text-xs font-medium text-slate-600">${message}</p>
+            </div>`;
+    }
+
+    function handleApiResponse(response, data, duration) {
+        executeBtn.disabled = false;
+        executeBtn.classList.remove("opacity-50", "cursor-not-allowed");
+
+        metaContainer.classList.remove("hidden");
+        executionTimeEl.innerText = `Time: ${duration} ms`;
+
+        if (!response.ok) {
+            handleApiError(data.message || data.error || `HTTP ${response.status} Error`);
+            return;
+        }
+
+        statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200";
+        statusBadge.innerText = `200 OK`;
+
+        const resultList = Array.isArray(data) ? data : (data.results || data.rows || []);
+        rowCountEl.innerText = `${resultList.length} row(s) returned`;
+
+        renderTable(resultList);
+        jsonViewer.textContent = JSON.stringify(data, null, 2);
+    }
+
+    function handleApiError(errorMessage) {
+        executeBtn.disabled = false;
+        executeBtn.classList.remove("opacity-50", "cursor-not-allowed");
+
+        metaContainer.classList.remove("hidden");
+        statusBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200";
+        statusBadge.innerText = "FAILED";
+        rowCountEl.innerText = "0 rows";
+
+        tableWrapper.innerHTML = `
+            <div class="p-6 bg-rose-50 border-l-4 border-rose-500 text-rose-800 m-4 rounded-r-xl space-y-1">
+                <div class="font-bold text-xs uppercase tracking-wider">Database Execution Error</div>
+                <div class="text-xs font-mono break-all">${errorMessage}</div>
+            </div>`;
+        jsonViewer.textContent = JSON.stringify({ error: errorMessage }, null, 2);
+    }
+
     function renderTable(rows) {
         if (!rows || rows.length === 0) {
             tableWrapper.innerHTML = `
-                <div class="p-8 text-center text-slate-400 text-sm">
-                    Query executed successfully, but returned 0 records (or non-tabular response).
+                <div class="p-12 text-center text-slate-400 text-xs">
+                    Query executed successfully, but returned 0 records.
                 </div>`;
             return;
         }
 
-        // Dynamically extract database column headers from first record keys
         const columns = Object.keys(rows[0]);
 
         let headMarkup = `
-            <tr class="bg-slate-100 border-b border-slate-200">
-                <th class="p-2.5 text-left text-xs font-bold text-slate-500 w-12 bg-slate-100 sticky top-0">#</th>`;
+            <tr class="bg-slate-100/80 border-b border-slate-200">
+                <th class="p-3 text-left text-[11px] font-bold text-slate-400 w-10 bg-slate-100 sticky top-0">#</th>`;
         columns.forEach(col => {
-            headMarkup += `<th class="p-2.5 text-left text-xs font-bold text-slate-700 font-mono uppercase bg-slate-100 sticky top-0">${col}</th>`;
+            headMarkup += `<th class="p-3 text-left text-[11px] font-bold text-slate-600 font-mono uppercase bg-slate-100 sticky top-0 tracking-wider">${col}</th>`;
         });
         headMarkup += `</tr>`;
 
         let bodyMarkup = "";
         rows.forEach((row, idx) => {
-            bodyMarkup += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">`;
-            bodyMarkup += `<td class="p-2.5 text-xs text-slate-400 font-mono">${idx + 1}</td>`;
+            bodyMarkup += `<tr class="border-b border-slate-100 hover:bg-blue-50/40 transition">`;
+            bodyMarkup += `<td class="p-3 text-xs text-slate-400 font-mono">${idx + 1}</td>`;
             columns.forEach(col => {
                 const val = row[col];
                 const displayVal = (typeof val === "object" && val !== null) ? JSON.stringify(val) : (val ?? "NULL");
                 const isNull = val === null;
-                bodyMarkup += `<td class="p-2.5 text-xs font-mono ${isNull ? 'text-slate-400 italic' : 'text-slate-800'} truncate max-w-xs">${displayVal}</td>`;
+                bodyMarkup += `<td class="p-3 text-xs font-mono ${isNull ? 'text-slate-400 italic' : 'text-slate-800'} truncate max-w-xs">${displayVal}</td>`;
             });
             bodyMarkup += `</tr>`;
         });

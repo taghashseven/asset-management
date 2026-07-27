@@ -3,7 +3,7 @@
    ========================================================================== */
 
 export const CONFIG = {
-  
+
   employees: {
     endpoint: "/api/employees",
     about: {
@@ -76,7 +76,8 @@ export const CONFIG = {
         readOnly: true
       }
     },
-    customViewFile: null
+    customViewFile: null , 
+    delete : true
   },
 
   "computer-assets": {
@@ -106,10 +107,7 @@ export const CONFIG = {
       date_issued: "date",
       date_returned: "date",
       notes: {
-        type: "textarea",
-        updateField: {
-          endpoint: "/api/assignments/update-notes"
-        }
+        type: "textarea"
       }
     },
     customViewFile: null,
@@ -158,9 +156,11 @@ export const CONFIG = {
   },
 
   printers: {
-    endpoint: "/api/printers",
+    // endpoint: "/api/printer",
+    endpoint: "/api/print/all",
     idField: "printer_id",
-    fields: ["asset_tag", "printer_name", "brand", "model", "status", "IP_address", "location", "toner", "page_count"],
+    update : "/api/print/upsert" ,
+    fields: ["asset_tag", "printer_name", "brand", "model", "status", "IP_address", "location",  "page_count"],
     fieldTypes: {
       status: ["Online", "Offline", "Maintenance"],
       page_count: "number"
@@ -180,15 +180,20 @@ export const CONFIG = {
 
   "printers-list": {
     endpoint: "/api/printers/all",
+    deleteEndPoint : "/api/printers" ,
     customViewFile: "./printerListView.js",
-    update: "/api/printers/update",
     idField: "printer_id",
-    fields: ["printer_id", "printer_name", "brand", "model", "ip_address", "mac_address", "status", "is_color", "page_count", "location", "toner_code"],
+    fields: ["printer_id", "printer_name", "brand", "model", "ip_address", "mac_address", "status", "is_color", "page_count", "location", "toner_code" , "images"],
     fieldTypes: {
       status: ["Active", "Inactive", "Retired", "standby"],
       is_color: [0, 1],
-      page_count: "number"
-    }
+      page_count: "number" , 
+      images : {
+        type : "array" , 
+        displayField : "image_path"
+      }
+    } , 
+    delete : true 
   },
 
   "printer-logs": {
@@ -597,7 +602,7 @@ export function renderDefaultTable(data = [], config = {}) {
               <a href="${srcUrl}" target="_blank" title="${fileName}" class="inline-block relative group">
                 <img src="${srcUrl}" 
                      alt="${fileName}" 
-                     class="w-8 h-8 object-cover rounded border border-slate-200 shadow-sm hover:scale-110 hover:z-10 hover:border-blue-500 transition-all duration-150 cursor-pointer"
+                     class="w-8 h-8 hover:w-32 hover:h-32 object-cover rounded border border-slate-200 shadow-sm hover:scale-210 hover:z-10 hover:border-blue-500 transition-all duration-150 cursor-pointer"
                      onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22 fill=%22%2394a3b8%22 viewBox=%220 0 16 16%22><path d=%22M14 3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12zM2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2z%22/><path d=%22M10.648 8.646a.5.5 0 0 1 .577-.093l3.777 1.947V14h-12v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z%22/></svg>';" />
               </a>
             `;
@@ -994,7 +999,7 @@ window.addFlatFileItem = function (field) {
   div.className = "nested-item-row bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-between gap-3 shadow-sm";
   div.innerHTML = `
     <div class="flex items-center gap-3 flex-1 overflow-hidden">
-      <img class="preview-thumb w-12 h-12 object-cover rounded border border-slate-200 hidden" alt="preview" />
+      <img class="preview-thumb w-32 h-32 object-cover rounded border border-slate-200 hidden" alt="preview" />
       <input type="file" name="${field}[]" accept="image/*" class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
     </div>
     <button type="button" onclick="this.closest('.nested-item-row').remove()" class="text-rose-500 hover:text-rose-700 text-xs font-bold px-1">✕</button>
@@ -1037,7 +1042,7 @@ function closeDrawer() {
   if (drawer) drawer.style.right = "-600px";
 }
 
-function openCreateForm() {
+export function openCreateForm() {
   editId = null;
   const config = CONFIG[currentModule];
   let html = "";
@@ -1183,7 +1188,8 @@ async function deleteRecord(id) {
   const config = CONFIG[currentModule];
   if (!confirm("Are you sure you want to permanently delete this record?")) return;
 
-  const targetUrl = `${config.endpoint}/${id}`;
+  const targetUrl =  config.deleteEndPoint ? `${config.deleteEndPoint}/${id}` :  `${config.endpoint}/${id}`;
+
   try {
     const response = await fetch(targetUrl, {
       method: "DELETE",

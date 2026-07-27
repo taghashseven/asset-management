@@ -74,6 +74,19 @@ router.post("/forms/create", async (req, res) => {
   }
 });
 
+// delete a form 
+router.delete("/forms/:id" , async (req  , res) => {
+  try {
+      const formId = await Employee.deleteEmployeeForm(req.params.id)
+      const getAllForms =await Employee.getAllEmployeeForms()
+      res.json(getAllForms)
+      return 
+  }
+  catch(err){
+     res.status(500).json({err :err.message})
+  }
+})
+
 /**
  * HELP route (like your printer example)
  */

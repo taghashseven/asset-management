@@ -2,6 +2,16 @@ import db from "../database/db.js";
 import { pathToFileURL } from "url";
 import fs from 'fs';
 import path from 'path';
+// Ensure you are importing from 'node:fs/promises' for async/await support
+import { unlink } from 'node:fs/promises';
+// Get the directory path of employee.js dynamically
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// delete a form for an employee
+// delete a form for an employee
+import { rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
+
 
 export async function getAll() {
   const query = `
@@ -134,8 +144,7 @@ export async function uploadEmployeeForm(employeeID, base64Input) {
     throw new Error("File too large");
   }
 
-  const timestamp = Date.now();
-  const newFileName = `${employeeID}.${timestamp}.pdf`;
+  const newFileName = `${employeeID}${base64Input[0].filename}.pdf`;
   const targetDir = 'public/forms';
   const fullFilePath = path.join(targetDir, newFileName);
   const relativeDbPath = path.join('forms', newFileName).replace(/\\/g, '/');
@@ -186,36 +195,69 @@ export async function uploadEmployeeForm(employeeID, base64Input) {
   }
 }
 
-// delete a form for an employee
+
 export async function deleteEmployeeForm(formID) {
+  // Start explicit transaction
+  await db.run("BEGIN IMMEDIATE");
+
   try {
-    // 1. Get the file path from the database
+    // 1. Fetch form path inside transaction context
     const form = await db.get(
       "SELECT file_path FROM employee_forms WHERE form_id = ?",
       [formID]
     );
 
     if (!form) {
-      throw new Error("Form not found");
+      const notFoundErr = new Error(`Form with ID ${formID} not found in database.`);
+      console.error(`[deleteEmployeeForm Error]: ${notFoundErr.message}`);
+      await db.run("ROLLBACK");
+      throw notFoundErr;
     }
 
-    // 2. Delete the file from the filesystem
-    await fs.promises.unlink(form.file_path);
+    const targetPath = path.join(__dirname, '..', 'public', form.file_path);
 
-    // 3. Delete the record from the database
+    // 2. Delete the DB record first
     await db.run(
       "DELETE FROM employee_forms WHERE form_id = ?",
       [formID]
     );
+
+    // 3. Delete the file from the filesystem
+    try {
+      await rm(targetPath, { force: true, maxRetries: 3, retryDelay: 100 });
+    } catch (fsErr) {
+      // Log the exact filesystem failure details before rolling back
+      console.error(`[deleteEmployeeForm FS Error]: Failed to delete file at path: "${targetPath}"`);
+      console.error(`[deleteEmployeeForm FS Error Details]:`, {
+        code: fsErr.code,
+        message: fsErr.message,
+        stack: fsErr.stack
+      });
+
+      await db.run("ROLLBACK");
+      throw new Error(`File deletion failed on disk (${fsErr.code || fsErr.message}); database changes rolled back.`);
+    }
+
+    // 4. Commit transaction only when disk operation succeeds
+    await db.run("COMMIT");
+    console.log(`[deleteEmployeeForm Success]: Successfully deleted form ID ${formID} and file at "${targetPath}".`);
+    return { success: true };
+
   } catch (err) {
-    console.error("Error deleting employee form:", err);
-    throw new Error("Failed to delete employee form");
+    // Safety net: ensure rollback if any unhandled error occurred
+    try {
+      await db.run("ROLLBACK");
+    } catch (rollbackErr) {
+      // Transaction was already closed/rolled back
+    }
+
+    // Log top-level failure trace
+    console.error(`[deleteEmployeeForm Failed]: Could not perform atomic deletion for Form ID ${formID}.`);
+    console.error(`[deleteEmployeeForm Stack]:`, err);
+
+    throw err;
   }
-
 }
-
-
-
 
 // ----------------------
 // MAIN GUARD (FIXED)

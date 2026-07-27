@@ -152,7 +152,7 @@
                   </span>
                 </div>
               </div>
-              <h3 class="text-base font-bold text-slate-800 truncate" title="${printer.displayName || printer.listName}">${printer.displayName || printer.listName || 'Generic Printer'}</h3>
+              <h3 class="text-base font-bold text-slate-800 truncate" title="${printer.displayName || printer.listName}">${printer.displayName || printer.listName || printer.printer_name || 'Generic Printer'}</h3>
               <p class="text-xs text-slate-400 mt-0.5 truncate" title="${printer.model}">${printer.model || 'Unknown Fleet Model'}</p>
               <div class="mt-5 space-y-3.5">
                 ${suppliesHtml}

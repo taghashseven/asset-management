@@ -2,13 +2,14 @@ import express from "express";
 import { getPrinterData } from "./scanprinters.js";
 
 import { getAllPrinters, 
-        createPrinter, 
+        upsertPrinter , 
         createTonerStock, 
         getAllTonerStock, 
         getPrinterById  , 
         updatePrinter , 
         getPrinterLogs , 
-        createPrinterLog
+        deletePrinter ,
+        createPrinterLog , 
     } from "../database/printer.js"
 
 const router = express.Router();
@@ -38,7 +39,19 @@ router.get("/all" , async (req , res ) => {
 // create printer 
 router.post("/create" , async (req , res ) => {
     try {
-        const result = await createPrinter(req.body);
+        const result = await upsertPrinter(req.body);
+        res.status(201).json(result);
+    }
+    catch (error) {
+        console.error("Error creating printer:", error);
+        res.status(500).json({ error: "Failed to create printer" });
+    }
+})
+
+// create printer 
+router.post("/all" , async (req , res ) => {
+    try {
+        const result = await upsertPrinter(req.body);
         res.status(201).json(result);
     }
     catch (error) {
@@ -51,7 +64,7 @@ router.post("/create" , async (req , res ) => {
 router.post("/update" , async (req , res ) => {
     try {
         const { printer_id, ...updateData } = req.body;
-        const result = await updatePrinter(printer_id, updateData);
+        const result = await upsertPrinter(req.body);
         res.status(200).json(result);
     }
     catch (error) {
@@ -135,6 +148,21 @@ router.post("/logs/:printerId", async (req, res) => {
         res.status(500).json({ error: "Failed to create printer log entry" });
     }
 });
+
+
+// delete printer 
+router.delete("/:printerId" , async (req , res) => {
+    try{
+        const { printerId } = req.params;
+        await deletePrinter(printerId)
+        const printers = await getAllPrinters()
+        res.json(printers)
+    }
+    catch(err){
+        console.log("error : " , err.message)
+        res.status(500).json({err : err.message})
+    } 
+})
 
 
 export default router;

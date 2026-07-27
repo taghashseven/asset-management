@@ -20,26 +20,48 @@
       <h1 class="text-2xl font-bold">Asset Manager</h1>
       <p class="text-sm text-slate-400">Admin Dashboard</p>
     </div>
-    <nav class="flex-1 p-4 space-y-2" id="sidebarNav">
-      <button class="nav-btn w-full text-left p-3 rounded bg-slate-800 font-semibold" data-module="employees">Employees</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="user-resources">User and Resource</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="forms">Forms</button>
+      <nav class="flex-1 p-4 space-y-2" id="sidebarNav">
+  <button class="nav-btn w-full text-left p-3 rounded bg-slate-800 font-semibold" data-module="employees">Employees</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="user-resources">User and Resource</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="forms">Forms</button>
 
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="computer-assets">Computer Assets</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="asset-assignments">Asset Assignments</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="monitors">Monitors</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="other_equipment">Other Equipment</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="computer-assets">Computer Assets</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="asset-assignments">Asset Assignments</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="monitors">Monitors</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="other_equipment">Other Equipment</button>
 
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="monitor-assignments">Monitor Assignments</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="printers">Printers</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="printers-list">Printers list</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="toner-stock">Toner Stock</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="printer-logs">Printer logs</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="api-database">API database</button>
-      <!-- forms -->
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="form-submissions">Form Submissions</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="monitor-assignments">Monitor Assignments</button>
+  
+  <!-- Collapsible Printers Group -->
+  <div class="space-y-1">
+    <button 
+      id="printersMenuToggle" 
+      type="button"
+      class="w-full text-left p-3 rounded hover:bg-slate-800 flex items-center justify-between font-semibold text-slate-200"
+    >
+      <span class="flex items-center gap-2">🞈 Printers System</span>
+      <span id="printersArrow" class="text-xs transition-transform duration-200">▼</span>
+    </button>
+    
+    <ul id="printersSubmenu" class="hidden pl-4 space-y-1">
+      <li>
+        <button class="nav-btn w-full text-left p-2.5 rounded hover:bg-slate-800 text-sm text-slate-300" data-module="printers">Dashboard Overview</button>
+      </li>
+      <li>
+        <button class="nav-btn w-full text-left p-2.5 rounded hover:bg-slate-800 text-sm text-slate-300" data-module="printers-list">Printers List</button>
+      </li>
+      <li>
+        <button class="nav-btn w-full text-left p-2.5 rounded hover:bg-slate-800 text-sm text-slate-300" data-module="toner-stock">Toner Stock</button>
+      </li>
+      <li>
+        <button class="nav-btn w-full text-left p-2.5 rounded hover:bg-slate-800 text-sm text-slate-300" data-module="printer-logs">Printer Logs</button>
+      </li>
+    </ul>
+  </div>
 
-    </nav>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="api-database">API database</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="form-submissions">Form Submissions</button>
+</nav>
   </aside>
 
   <!-- Main Content Body -->
@@ -131,5 +153,36 @@
 <div id="toast-container" class="fixed bottom-5 right-5 space-y-3 z-50 pointer-events-none"></div>
 
 <script type="module" src="./app.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+  // --- Collapsible Submenu Toggle ---
+  const toggleBtn = document.getElementById("printersMenuToggle");
+  const submenu = document.getElementById("printersSubmenu");
+  const arrow = document.getElementById("printersArrow");
+
+  if (toggleBtn && submenu) {
+    toggleBtn.addEventListener("click", () => {
+      const isHidden = submenu.classList.toggle("hidden");
+      if (arrow) {
+        arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(180deg)";
+      }
+    });
+  }
+
+  // --- Active Class Handling for Nav Buttons ---
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".nav-btn").forEach((b) => {
+        b.classList.remove("bg-slate-800", "text-white", "font-semibold");
+      });
+      btn.classList.add("bg-slate-800", "text-white", "font-semibold");
+      activePrinterId = null;
+      loadModule(btn.dataset.module);
+    });
+  });
+
+  // ... rest of DOMContentLoaded setup ...
+});
+</script>
 </body>
 </html>
