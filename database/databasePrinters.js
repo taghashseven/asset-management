@@ -1,12 +1,11 @@
 import snmp from "net-snmp";
 import db from "../database/db.js";
 
-
 const COMMUNITY = "public";
 
 const OIDS = {
-    hostname: "1.3.6.1.2.1.1.5.0",           // sysName
-    model: "1.3.6.1.2.1.1.1.0",              // sysDescr
+    hostname: "1.3.6.1.2.1.1.5.0",               // sysName
+    model: "1.3.6.1.2.1.1.1.0",                  // sysDescr
     pagesPrinted: "1.3.6.1.2.1.43.10.2.1.4.1.1", // prtMarkerLifeCount
     tonerNames: "1.3.6.1.2.1.43.11.1.1.6",       // prtMarkerSuppliesDescription
     tonerMaxCapacity: "1.3.6.1.2.1.43.11.1.1.8", 
@@ -56,7 +55,63 @@ function walkOid(session, oid, supplyTable, columnKey) {
     });
 }
 
-// Dynamic Scan Function formatted to match target output format
+// ============================================================================
+// AUTOMATED TONER DETECTION LOGIC
+// ============================================================================
+
+export async function processTonerDetection(printerId, supplies, currentPageCount) {
+    if (!printerId || !supplies || !Array.isArray(supplies) || supplies.length === 0) return;
+
+    for (const supply of supplies) {
+        const tonerCode = supply.name; // Unique supply name string (e.g. "Black Cartridge HP CF226A")
+        const currentLevel = supply.level;
+
+        try {
+            // Fetch the absolute LAST entry recorded for this specific printer and supply slot
+            const lastEntry = await db.get(
+                `SELECT * FROM printer_toners 
+                 WHERE printer_id = ? AND toner_code = ? 
+                 ORDER BY id DESC LIMIT 1`,
+                [printerId, tonerCode]
+            );
+
+            // CASE 1: No previous record exists OR the new level is GREATER than the last level (Refill/Replacement)
+            if (!lastEntry || currentLevel > lastEntry.toner_level) {
+                
+                // 1. Insert a new row marking the start of a new cartridge
+                await db.run(
+                    `INSERT INTO printer_toners (printer_id, toner_code, toner_level, initial_page, current_page) 
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [printerId, tonerCode, currentLevel, currentPageCount, currentPageCount]
+                );
+
+                // 2. Log event to printer logs table
+                await createPrinterLog(printerId, {
+                    event_type: 'TONER_REPLACEMENT',
+                    toner_name: tonerCode,
+                    color: extractColorFromName(tonerCode),
+                    description: `New toner registered (${tonerCode}) at page count ${currentPageCount}.`
+                });
+
+            } else {
+                // CASE 2: Level is lower or equal (Normal depletion) -> Update current record
+                await db.run(
+                    `UPDATE printer_toners 
+                     SET toner_level = ?, current_page = ? 
+                     WHERE id = ?`,
+                    [currentLevel, currentPageCount, lastEntry.id]
+                );
+            }
+        } catch (error) {
+            console.error(`[Toner Detection Error] Printer ID ${printerId}:`, error.message);
+        }
+    }
+}
+
+// ============================================================================
+// SNMP SCANNER
+// ============================================================================
+
 async function scanPrinter(printer) {
     const printerName = printer?.printer_name || "Unknown Printer";
     const ipAddress = printer?.ip_address || null;
@@ -161,6 +216,7 @@ async function scanPrinter(printer) {
     }
 }
 
+// Fetch database printers, execute active network scan, process metrics & return list
 export async function getAllPrinters() {
     try {
         const dbPrinters = await db.all(`SELECT * FROM printers WHERE status != 'Retired'`);
@@ -172,28 +228,70 @@ export async function getAllPrinters() {
         const scanPromises = dbPrinters.map(printer => scanPrinter(printer));
         const scanResults = await Promise.all(scanPromises);
 
-        // Perform side-effect DB updates without altering scanResults structure
-        for (const scanned of scanResults) {
-            if (scanned.status !== "Online") continue;
+        const enrichedResults = await Promise.all(
+            scanResults.map(async (scanned) => {
+                if (scanned.status !== "Online") {
+                    return { ...scanned, toner: scanned.toner || [] };
+                }
 
-            const targetPrinter = dbPrinters.find(p => p.printer_id === scanned.printer_id || p.ip_address === scanned.ip);
-            if (!targetPrinter) continue;
+                const targetPrinter = dbPrinters.find(
+                    p => p.printer_id === scanned.printer_id || p.ip_address === scanned.ip
+                );
 
-            // Sync Page Counter when new prints occur
-            if (scanned.pagesPrinted !== null && scanned.pagesPrinted > targetPrinter.page_count) {
-                await updatePrinterPageCount(targetPrinter.printer_id, scanned.pagesPrinted);
-            }
-        }
+                if (!targetPrinter) return scanned;
 
-        return scanResults;
+                // 1. Sync Page Counter when new prints occur
+                if (scanned.pagesPrinted !== null && scanned.pagesPrinted > targetPrinter.page_count) {
+                    await updatePrinterPageCount(targetPrinter.printer_id, scanned.pagesPrinted);
+                }
+
+                const currentPages = scanned.pagesPrinted !== null ? scanned.pagesPrinted : targetPrinter.page_count;
+
+                // 2. Process automated toner detection
+                await processTonerDetection(targetPrinter.printer_id, scanned.supplies, currentPages);
+
+                // 3. Fetch active toner tracking records from database
+                const dbToners = await db.all(
+                    `SELECT toner_code, created_at, initial_page , current_page
+                     FROM printer_toners
+                     WHERE printer_id = ? `,
+                    [targetPrinter.printer_id]
+                );
+
+                // 4. Enrich toner list with installation date and pages printed with that toner
+                const enrichedToner = (scanned.toner || []).map(t => {
+                    const matchedDbToner = dbToners.find(dbT => dbT.toner_code === t.name);
+
+                    const installDate = matchedDbToner ? matchedDbToner.created_at : null;
+                    const startPages =  matchedDbToner.initial_page  
+
+                    const pagesPrintedWithToner =   matchedDbToner ? ( matchedDbToner.current_page  -  matchedDbToner.initial_page    ): null
+
+                    return {
+                        ...t,
+                        installDate: installDate,
+                        installedAtPage: startPages,
+                        pagesPrintedWithToner: pagesPrintedWithToner
+                    };
+                });
+
+                return {
+                    ...scanned,
+                    toner: enrichedToner
+                };
+            })
+        );
+
+        return enrichedResults;
     } catch (error) {
         console.error(`[getAllPrinters Error]:`, error.message);
         throw error;
     }
 }
 
+
 // ============================================================================
-// DATABASE CRUD & LOGIC (WITH UNDEFINED GUARDS)
+// DATABASE CRUD & LOGIC
 // ============================================================================
 
 export async function updatePrinterPageCount(printerId, newPageCount) {
@@ -225,7 +323,6 @@ export async function createPrinterLog(printerId, logData = {}) {
             throw new Error('toner_name cannot be null or empty for TONER_REPLACEMENT events.');
         }
 
-        // FIX: Replaced explicit undefined values with null fallback
         const result = await db.run(
             `INSERT INTO printer_log (printer_id, event_type, toner_name, color, description)
              VALUES (?, ?, ?, ?, ?)`,
@@ -276,17 +373,13 @@ export async function upsertPrinter(printer = {}) {
             throw new Error("Printer name is required.");
         }
 
-        // Helper to convert empty strings ("") or undefined to NULL for SQLite
         const cleanStr = (val) => (val !== undefined && val !== null && String(val).trim() !== "" ? String(val).trim() : null);
-        
-        // Helper to safely parse integers (e.g. convert "" to 0)
         const cleanInt = (val, fallback = 0) => {
             const parsed = parseInt(val, 10);
             return isNaN(parsed) ? fallback : parsed;
         };
 
         if (printer_id) {
-            // UPDATE: 12 parameters required (11 SET values + 1 WHERE parameter)
             const params = [
                 cleanStr(asset_tag),
                 cleanStr(printer_name),
@@ -299,7 +392,7 @@ export async function upsertPrinter(printer = {}) {
                 cleanInt(is_color, 0),
                 cleanInt(page_count, 0),
                 cleanStr(location),
-                printer_id // 12th parameter for WHERE printer_id = ?
+                printer_id
             ];
 
             const result = await db.run(
@@ -321,7 +414,6 @@ export async function upsertPrinter(printer = {}) {
             return { success: true, updated: result.changes > 0, printer_id };
 
         } else {
-            // INSERT: 11 parameters required
             const params = [
                 cleanStr(asset_tag),
                 cleanStr(printer_name),
@@ -374,7 +466,7 @@ export async function getPrinterTonerStats(printerId) {
     try {
         if (!printerId) throw new Error("Printer ID is required.");
         return await db.all(
-            `SELECT * FROM v_toner_performance_stats WHERE printer_id = ? ORDER BY installed_at DESC`,
+            `SELECT * FROM printer_toners WHERE printer_id = ? ORDER BY id DESC`,
             [printerId]
         );
     } catch (error) {
