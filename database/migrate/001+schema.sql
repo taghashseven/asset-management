@@ -301,4 +301,4 @@ INNER JOIN employees e
     ON e.email = ma.employee_email
 INNER JOIN monitors m
     ON m.serial_number = ma.monitor_serial_number
-WHERE ma.date_returned IS NULL;
+WHERE ma.date_returned IS NULL; 

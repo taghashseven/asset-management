@@ -83,7 +83,7 @@ export const CONFIG = {
   "computer-assets": {
     endpoint: "/api/assets",
     idField: "asset_id",
-    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location" , "images"],
+    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location" , "specs","images" , "first_name" , "last_name" , "job_title"],
     fieldTypes: {
       status: ["Available", "Deployed", "In Repair", "Scrapped"],
       bitlocker_key: {
@@ -108,7 +108,14 @@ export const CONFIG = {
       date_returned: "date",
       notes: {
         type: "textarea"
-      }
+      } , 
+      employee_email: {
+        type: "lookup",
+        searchEndpoint: "/api/employees",
+        searchKeys: ["email", "first_name", "last_name", "employee_id"],
+        targetField: "email",
+        displayFormat: (item) => `${item.first_name || ''} ${item.last_name || ''} (${item.email || ''})`.trim()
+      },
     },
     customViewFile: null,
     delete: true
@@ -130,8 +137,9 @@ export const CONFIG = {
 
   "monitor-assignments": {
     endpoint: "/api/usermonitors",
+    update : "/api/usermonitors/update" ,
     idField: "id",
-    fields: ["monitor_serial_number", "employee_email", "date_issued", "date_returned"],
+    fields: ["id" ,"monitor_serial_number", "employee_email", "date_issued", "date_returned"],
     fieldTypes: {
       date_issued: "date",
       date_returned: "date"
@@ -1260,6 +1268,65 @@ export async function deleteExistingFile(moduleName, field, recordId, fileIdenti
     showToast(`Failed to delete file: ${err.message}`, "error");
   }
 }
+
+
+/* ==========================================================================
+   EXPORTER UTILITY (EXCEL)
+   ========================================================================== */
+
+export function exportToExcel() {
+  const dataset = filteredData.length > 0 ? filteredData : masterData;
+
+  if (!dataset || dataset.length === 0) {
+    showToast("No data available to export.", "error");
+    return;
+  }
+
+  const config = CONFIG[currentModule];
+  const fieldsToExport = visibleFields.length > 0 ? visibleFields : (config?.fields || Object.keys(dataset[0]));
+
+  // Clean and format rows for spreadsheet output
+  const processedRows = dataset.map((row) => {
+    const cleanedRow = {};
+
+    fieldsToExport.forEach((field) => {
+      const headerLabel = field.replaceAll("_", " ").toUpperCase();
+      let value = row[field];
+
+      if (Array.isArray(value)) {
+        // Flatten arrays (e.g., nested objects/images/assignments) to readable comma-separated strings
+        value = value
+          .map((item) => (typeof item === "object" ? Object.values(item).filter(Boolean).join(" - ") : item))
+          .join("; ");
+      } else if (typeof value === "object" && value !== null) {
+        value = JSON.stringify(value);
+      }
+
+      cleanedRow[headerLabel] = value ?? "";
+    });
+
+    return cleanedRow;
+  });
+
+  // Convert JSON to Worksheet & Workbook
+  const worksheet = XLSX.utils.json_to_sheet(processedRows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, currentModule);
+
+  // Generate File Name based on active module and timestamp
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const fileName = `${currentModule}_export_${dateStr}.xlsx`;
+
+  // Trigger browser download
+  XLSX.writeFile(workbook, fileName);
+  showToast(`Successfully exported ${processedRows.length} records to Excel!`, "success");
+}
+
+// Bind click event listener on DOM Content Loaded
+document.addEventListener("DOMContentLoaded", () => {
+  // Existing bindings...
+  document.getElementById("exportExcelBtn")?.addEventListener("click", exportToExcel);
+});
 
 // Bind to window for inline onclick execution
 window.deleteExistingFile = deleteExistingFile;

@@ -8,25 +8,36 @@ export async function getAllComputerAssets() {
       ca.*,
       (aa.employee_email IS NOT NULL) AS is_assigned,
       aa.employee_email AS assigned_to,
+      e.first_name,
+      e.last_name,
+      e.job_title,
       (
         SELECT json_group_array(image_path)
         FROM computer_asset_images cai
-        WHERE cai.asset_id = ca.asset_id AND cai.image_path IS NOT NULL
+        WHERE cai.asset_id = ca.asset_id
+          AND cai.image_path IS NOT NULL
       ) AS images
     FROM computer_assets ca
-    LEFT JOIN asset_assignments aa 
-      ON ca.serial_number = aa.serial_number 
+    LEFT JOIN asset_assignments aa
+      ON ca.serial_number = aa.serial_number
       AND aa.date_returned IS NULL
-    ORDER BY ca.asset_number
+    LEFT JOIN employees e
+      ON aa.employee_email = e.email
+    ORDER BY
+      e.job_title IS NULL,      -- Unassigned assets last
+      e.job_title ASC,
+      e.last_name ASC,
+      e.first_name ASC,
+      ca.asset_number ASC
   `);
 
-  // Parse the JSON string from SQLite into a JavaScript Array
   return rows.map(row => ({
     ...row,
     is_assigned: Boolean(row.is_assigned),
-    images: JSON.parse(row.images || '[]')
+    images: JSON.parse(row.images || "[]")
   }));
 }
+
 
 export async function getComputerAssetById(id) {
   return db.get(

@@ -7,6 +7,8 @@
   <title>Asset Management Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Include SheetJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .dropdown-menu.hidden { display: none; }
   </style>
@@ -66,12 +68,18 @@
 
   <!-- Main Content Body -->
   <main class="flex-1 flex flex-col overflow-hidden">
+   
     <header id="standardHeader" class="bg-white shadow px-6 py-4 flex justify-between items-center z-10">
       <div>
         <h2 id="pageTitle" class="text-2xl font-bold">Employees</h2>
         <p class="text-slate-500">Manage records <span id="recordCount"></span></p>
       </div>
       <div class="flex gap-3 items-center">
+        <!-- NEW: Export to Excel Button -->
+        <button id="exportExcelBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
+          📊 Export to Excel
+        </button>
+        
         <div class="relative inline-block text-left" id="columnSelectorContainer">
           <button id="columnDropdownBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium">
             ⚙️ Columns & Sizing
