@@ -92,7 +92,11 @@ export const CONFIG = {
       }   ,
       images : {
         type : "array" 
-      }
+      } , 
+      description : {
+        type : "text" , 
+        truncate : 30
+      } 
       
     },
     customViewFile: null
