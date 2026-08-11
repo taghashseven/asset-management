@@ -71,9 +71,10 @@ export async function upsertComputerAsset(asset) {
         status,
         specs,
         location,
-        bitlocker_key
+        bitlocker_key , 
+        description
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?)
 
       ON CONFLICT(serial_number)
       DO UPDATE SET
@@ -87,7 +88,8 @@ export async function upsertComputerAsset(asset) {
         status = excluded.status,
         specs = excluded.specs,
         location = excluded.location,
-        bitlocker_key = excluded.bitlocker_key
+        bitlocker_key = excluded.bitlocker_key,
+        description = excluded.description
       `,
       [
         assetNumber,
@@ -101,7 +103,8 @@ export async function upsertComputerAsset(asset) {
         asset.status,
         asset.specs,
         asset.location,
-        asset.bitlocker_key
+        asset.bitlocker_key,
+        asset.description
       ]
     );
 

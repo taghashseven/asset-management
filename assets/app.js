@@ -83,7 +83,7 @@ export const CONFIG = {
   "computer-assets": {
     endpoint: "/api/assets",
     idField: "asset_id",
-    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location" , "specs","images" , "first_name" , "last_name" , "job_title"],
+    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location" , "description" ,  "specs","images" , "first_name" , "last_name" , "job_title"],
     fieldTypes: {
       status: ["Available", "Deployed", "In Repair", "Scrapped"],
       bitlocker_key: {
@@ -223,7 +223,14 @@ export const CONFIG = {
   "form-submissions": {
     customViewFile: "./formSubmissionsView.js",
     standalone: true
-  }
+  } ,
+
+  "dashboard": {
+    customViewFile: "./overviewDashboardView.js",
+    standalone: true
+  },
+
+
 };
 
 /* ==========================================================================
@@ -271,7 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.addEventListener("click", closeColumnDropdown);
   document.getElementById("closeDrawerBtn")?.addEventListener("click", closeDrawer);
 
-  loadModule("employees");
+  loadModule("dashboard");
 });
 
 /* ==========================================================================
