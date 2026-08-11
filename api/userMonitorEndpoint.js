@@ -1,7 +1,8 @@
 import express from "express";
 import {
   assignMonitor,
-  getAllMonitorAssignments
+  getAllMonitorAssignments,
+  updateMonitorAssignment
 } from "../database/monitorAssignement.js";
 
 const router = express.Router();
@@ -36,8 +37,25 @@ router.get("/assignments", async (req, res) => {
 // create a monitor assignment
 router.post("/", async (req, res) => {
     try {
-        console.log("Request body for monitor assignment:", req.body);
         const assignmentId = await assignMonitor(req.body);
+        res.status(201).json({
+            success: true,
+            assignmentId
+        });
+    }
+    catch (err) {
+        console.error("Error assigning monitor:", err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+}) ; 
+
+// update 
+
+router.post("/update", async (req, res) => {
+    try {
+        const assignmentId = await updateMonitorAssignment(req.body);
         res.status(201).json({
             success: true,
             assignmentId

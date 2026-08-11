@@ -1,29 +1,8 @@
 
-GET http://localhost:3000/api/assets/269 HTTP/1.1
 
-
-### Post 
-POST http://localhost:3000/api/assets/ HTTP/1.1
+POST http://localhost:3000/api/database-api/table
 Content-Type: application/json
 
 {
-  "asset_id": 269,
-  "asset_number": "00000",
-  "serial_number": " 2XMH2G4",
-  "device_type": "Desktop",
-  "brand": "Dell",
-  "model": "Dell Pro Slim Essential QVS1260",
-  "eth_mac_addr": "D4-A2-CD-A9-C6-00",
-  "wifi_mac_addr": "08-F9-7E-0E-DC-7B",
-  "bitlocker_key": "000583-356840-105666-195195-035783-384912-419529-517055",
-  "purchase_date": null,
-  "status": "Available",
-  "specs": null,
-  "location": null
+  "tableName": "asset_assignments"
 }
-
-
-
-####
-
-POST http://localhost:3000/api/assets

@@ -1,5 +1,7 @@
-CREATE TABLE users (
-    
+
+
+CREATE TABLE IF NOT EXISTS users (
+
     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
 
     username TEXT NOT NULL UNIQUE,
@@ -8,9 +10,14 @@ CREATE TABLE users (
     role TEXT NOT NULL DEFAULT 'user'
     CHECK (
         role IN (
-            'user',
-            'admin' , 
+                        'user',
+            'admin',
             'superadmin'
         )
     )
- ) ;
+);
+
+
+
+ALTER TABLE employees
+ADD COLUMN note TEXT;

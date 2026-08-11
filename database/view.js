@@ -8,7 +8,7 @@ export const getUserMonitorsAndAssets = async () => {
         e.email,
         e.first_name,
         e.last_name,
-        e.department, -- Included department field here
+        e.department,
 
         ca.asset_number,
         ca.serial_number AS computer_serial_number,
@@ -18,7 +18,10 @@ export const getUserMonitorsAndAssets = async () => {
         m.asset_number AS monitor_asset_number,
         m.serial_number AS monitor_serial_number,
         m.brand AS monitor_brand,
-        m.model AS monitor_model
+        m.model AS monitor_model,
+
+        ef.form_id,
+        ef.file_path AS form_path
 
     FROM employees e
 
@@ -36,8 +39,12 @@ export const getUserMonitorsAndAssets = async () => {
     LEFT JOIN monitors m
         ON m.serial_number = ma.monitor_serial_number
 
-    ORDER BY e.department ASC, e.first_name ASC, e.last_name ASC -- Sorted by department first
+    LEFT JOIN employee_forms ef
+        ON ef.employee_id = e.employee_id
+
+    ORDER BY e.department ASC, e.first_name ASC, e.last_name ASC
   `);
+
 
   const employees = new Map();
 
@@ -50,15 +57,18 @@ export const getUserMonitorsAndAssets = async () => {
         email: row.email,
         first_name: row.first_name,
         last_name: row.last_name,
-        department: row.department, // Added to the mapped payload object structure
+        department: row.department,
+
         computers: [],
-        monitors: []
+        monitors: [],
+        forms: []
       });
     }
 
     const employee = employees.get(row.employee_id);
 
-    // Add computer if present and not already added
+
+    // Add computer
     if (row.computer_serial_number) {
 
       const exists = employee.computers.some(
@@ -75,7 +85,8 @@ export const getUserMonitorsAndAssets = async () => {
       }
     }
 
-    // Add monitor if present and not already added
+
+    // Add monitor
     if (row.monitor_serial_number) {
 
       const exists = employee.monitors.some(
@@ -91,13 +102,27 @@ export const getUserMonitorsAndAssets = async () => {
         });
       }
     }
+
+
+    // Add forms
+    if (row.form_id) {
+
+      const exists = employee.forms.some(
+        f => f.form_id === row.form_id
+      );
+
+      if (!exists) {
+        employee.forms.push({
+          form_id: row.form_id,
+          path: row.form_path
+        });
+      }
+    }
   }
 
-  // Because JS Maps maintain insertion order, turning this Map into an array 
-  // preserves the SQL query's exact "ORDER BY department" sequence.
+
   return Array.from(employees.values());
 };
-
 
 // computers not assigned 
 export const getUnassignedComputers = async () => {
@@ -128,4 +153,8 @@ export const getUnassignedMonitors = async () => {
 }
 
 
-
+export const createFormForUser = async () =>{
+  const create = await db.all(`
+        
+    `)
+}

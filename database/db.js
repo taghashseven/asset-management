@@ -1,44 +1,68 @@
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 import fs from "fs/promises";
-import { pathToFileURL } from "url";
+import path from "path";
 
-const SCHEMA_VERSION = 1;
-
-const db = await open({
-  filename: "./assets.db",
-  driver: sqlite3.Database
+export const db = await open({
+    filename: "./assets.db",
+    driver: sqlite3.Database
 });
 
 await db.exec("PRAGMA foreign_keys = ON");
 
-// Read current database version
-const result = await db.get("PRAGMA user_version");
-const currentVersion = result.user_version;
+const { user_version } = await db.get("PRAGMA user_version");
 
-if (currentVersion < SCHEMA_VERSION) {
-  console.log(
-    `Updating database schema from v${currentVersion} to v${SCHEMA_VERSION}`
-  );
+const migrationFolder = "./database/migrate";
 
-  const schema = await fs.readFile(
-    "./database/schema.sql",
-    "utf8"
-  );
+const files = (await fs.readdir(migrationFolder))
+    .filter(file => file.endsWith(".sql"))
+    .sort();
 
-  await db.exec(schema);
+let version = user_version;
 
-  await db.exec(
-    `PRAGMA user_version = ${SCHEMA_VERSION}`
-  );
+for (const file of files) {
 
-  console.log("Schema updated");
+    const migrationVersion = parseInt(file.split("_")[0], 10);
+
+    if (migrationVersion > version) {
+
+        console.log(`Running ${file}`);
+
+        const sql = await fs.readFile(
+            path.join(migrationFolder, file),
+            "utf8"
+        );
+
+        await db.exec(sql);
+
+        version = migrationVersion;
+
+        await db.exec(
+            `PRAGMA user_version = ${version}`
+        );
+
+        console.log(`${file} applied`);
+    }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  console.log("Running directly");
+// if the database is empty, insert the default admin user
+const adminExists = await db.get(
+    "SELECT * FROM users WHERE username = ?",
+    "admin"
+);
 
-
+if (!adminExists) {
+    const bcrypt = await import("bcrypt");
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash("admin", saltRounds);
+    await db.run(
+        "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+        "admin",
+        passwordHash,
+        "admin"
+    );
 }
+
+
 
 export default db;

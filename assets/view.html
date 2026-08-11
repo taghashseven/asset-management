@@ -1,76 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/x-icon" href="/icon.jpg">
-<title>Asset Management Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
-<style>
-  .dropdown-menu.hidden { display: none; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/icon.jpg">
+  <title>Asset Management Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Include SheetJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .dropdown-menu.hidden { display: none; }
+  </style>
 </head>
-<body class="bg-slate-100" onclick="closeColumnDropdown(event)">
+<body class="bg-slate-100">
 
 <div class="flex h-screen">
-
+  <!-- Sidebar Navigation -->
   <aside class="w-72 bg-slate-900 text-white flex flex-col shrink-0">
     <div class="p-5 border-b border-slate-700">
       <h1 class="text-2xl font-bold">Asset Manager</h1>
       <p class="text-sm text-slate-400">Admin Dashboard</p>
     </div>
+      <nav class="flex-1 p-4 space-y-2" id="sidebarNav">
+  <button class="nav-btn w-full text-left p-3 rounded bg-slate-800 font-semibold" data-module="dashboard">📊 Main Dashboard</button>
+  <button class="nav-btn w-full text-left p-3 rounded bg-slate-800 font-semibold" data-module="employees">Employees</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="user-resources">User and Resource</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="forms">Forms</button>
 
-    <nav class="flex-1 p-4 space-y-2">
-      <button class="nav-btn w-full text-left p-3 rounded bg-slate-800" data-module="employees">Employees</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="user-resources">User and Resource</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="computer-assets">Computer Assets</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="asset-assignments">Asset Assignments</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="monitors">Monitors</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="monitor-assignments">Monitor Assignments</button>
-      <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="printers">Printers</button>
-    </nav>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="computer-assets">Computer Assets</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="asset-assignments">Asset Assignments</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="monitors">Monitors</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="other_equipment">Other Equipment</button>
+
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="monitor-assignments">Monitor Assignments</button>
+  
+  <!-- Collapsible Printers Group -->
+  <div class="space-y-1">
+    <button 
+      id="printersMenuToggle" 
+      type="button"
+      class="w-full text-left p-3 rounded hover:bg-slate-800 flex items-center justify-between font-semibold text-slate-200"
+    >
+      <span class="flex items-center gap-2">🞈 Printers System</span>
+      <span id="printersArrow" class="text-xs transition-transform duration-200">▼</span>
+    </button>
+    
+    <ul id="printersSubmenu" class="hidden pl-4 space-y-1">
+      <li>
+        <button class="nav-btn w-full text-left p-2.5 rounded hover:bg-slate-800 text-sm text-slate-300" data-module="printers">Dashboard Overview</button>
+      </li>
+      <li>
+        <button class="nav-btn w-full text-left p-2.5 rounded hover:bg-slate-800 text-sm text-slate-300" data-module="printers-list">Printers List</button>
+      </li>
+      <li>
+        <button class="nav-btn w-full text-left p-2.5 rounded hover:bg-slate-800 text-sm text-slate-300" data-module="toner-stock">Toner Stock</button>
+      </li>
+      <li>
+        <button class="nav-btn w-full text-left p-2.5 rounded hover:bg-slate-800 text-sm text-slate-300" data-module="printer-logs">Printer Logs</button>
+      </li>
+    </ul>
+  </div>
+
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="api-database">API database</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="form-submissions">Form Submissions</button>
+</nav>
   </aside>
 
+  <!-- Main Content Body -->
   <main class="flex-1 flex flex-col overflow-hidden">
-
+   
     <header id="standardHeader" class="bg-white shadow px-6 py-4 flex justify-between items-center z-10">
       <div>
         <h2 id="pageTitle" class="text-2xl font-bold">Employees</h2>
         <p class="text-slate-500">Manage records <span id="recordCount"></span></p>
       </div>
-
       <div class="flex gap-3 items-center">
+        <!-- NEW: Export to Excel Button -->
+        <button id="exportExcelBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
+          📊 Export to Excel
+        </button>
+        
         <div class="relative inline-block text-left" id="columnSelectorContainer">
-          <button onclick="toggleColumnDropdown(event)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium">
+          <button id="columnDropdownBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium">
             ⚙️ Columns & Sizing
           </button>
           <div id="columnDropdown" class="dropdown-menu hidden absolute right-0 mt-2 w-72 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 p-4 space-y-3 max-h-80 overflow-y-auto z-50"></div>
         </div>
-
-        <input id="searchBox" placeholder="Search..." class="border rounded-lg px-3 py-2 text-sm">
-        <button id="newBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ New Record</button>
+        <input id="searchBox" placeholder="Search..." class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button id="newBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ New Record</button>
       </div>
     </header>
 
     <section class="flex-1 overflow-auto p-6">
-      
+      <!-- Standard Data Table View Wrapper -->
       <div id="tableViewWrapper" class="bg-white rounded-xl shadow overflow-hidden flex flex-col h-full justify-between">
         <div class="overflow-auto flex-1">
-          <table class="w-full table-fixed"> <thead id="tableHead" class="bg-slate-200 sticky top-0 z-0"></thead>
+          <table class="w-full table-fixed">
+            <thead id="tableHead" class="bg-slate-200 sticky top-0 z-0"></thead>
             <tbody id="tableBody"></tbody>
           </table>
         </div>
-
+        
+        <!-- Pagination Controls Footer -->
         <div class="bg-slate-50 border-t px-6 py-4 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-4 text-sm text-slate-600">
             <div>
               Show 
-              <select id="pageSizeSelector" class="border rounded px-2 py-1 mx-1 bg-white">
+              <select id="pageSizeSelector" class="border rounded px-2 py-1 mx-1 bg-white focus:outline-none">
                 <option value="5">5</option>
-                <option value="10" >10</option>
+                <option value="10">10</option>
                 <option value="25">25</option>
                 <option value="50" selected>50</option>
+                <option value="100">100</option>
               </select>
               entries
             </div>
@@ -80,570 +122,76 @@
         </div>
       </div>
 
+      <!-- Specialized Printer Dashboard View -->
       <div id="printerViewWrapper" class="hidden space-y-6 h-full overflow-y-auto">
-        <!-- refresh button on right -->
+        
+        
+
         <div class="flex justify-end">
-          <button id="refreshButton" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg flex items-center gap-2" onclick="loadModule('printers' , true)">
-            <i data-lucide="refresh-cw"></i>
-            <span>Refresh </span>
+          <!-- add new printer button -->
+          <button id="newPrinterBtn" class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg flex items-center gap-2 font-medium transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>New Printer</span>
+          </button>
+
+          <button id="refreshButton" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg flex items-center gap-2 font-medium transition">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            <span>Refresh</span>
           </button>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
-          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-slate-500 uppercase">Total Printers</p>
-              <p id="stat-total" class="text-3xl font-bold text-slate-900 mt-1">0</p>
-            </div>
-            <div class="p-3 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="layers"></i></div>
-          </div>
-          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-slate-500 uppercase">Online</p>
-              <p id="stat-online" class="text-3xl font-bold text-emerald-600 mt-1">0</p>
-            </div>
-            <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="check-circle"></i></div>
-          </div>
-          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-slate-500 uppercase">Low Supplies</p>
-              <p id="stat-low" class="text-3xl font-bold text-amber-500 mt-1">0</p>
-            </div>
-            <div class="p-3 bg-amber-50 text-amber-500 rounded-lg"><i data-lucide="alert-triangle"></i></div>
-          </div>
-          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-slate-500 uppercase">Offline / Error</p>
-              <p id="stat-offline" class="text-3xl font-bold text-rose-600 mt-1">0</p>
-            </div>
-            <div class="p-3 bg-rose-50 text-rose-600 rounded-lg"><i data-lucide="x-circle"></i></div>
-          </div>
-        </div>
-
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div class="relative w-full sm:w-72">
-            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3.5"></i>
-            <input id="printer-search-bar" type="text" placeholder="Search by IP, Name, Model..." class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-          </div>
-          <div id="filter-container" class="flex items-center space-x-2 w-full sm:w-auto justify-end">
-            <span class="text-xs font-medium text-slate-400 uppercase mr-2">Filter status:</span>
-            <button data-filter="all" class="printer-filter-btn px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded-md border border-blue-200 cursor-pointer">All</button>
-            <button data-filter="online" class="printer-filter-btn px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-md transition cursor-pointer">Online</button>
-            <button data-filter="offline" class="printer-filter-btn px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-md transition cursor-pointer">Offline</button>
-          </div>
-        </div>
-
+       
+        
         <div id="printer-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6"></div>
       </div>
-
     </section>
-
   </main>
 </div>
 
-<div id="drawer" class="fixed top-0 right-[-600px] h-full w-[550px] bg-white shadow-2xl transition-all duration-300 overflow-auto z-50">
-  <div class="p-6 border-b flex justify-between items-center">
-    <h3 id="drawerTitle" class="text-xl font-bold">Record</h3>
-    <button onclick="closeDrawer()" class="text-red-600 font-bold">X</button>
+<!-- Slide-out Configuration and Input Drawer -->
+<div id="drawer" class="fixed top-0 right-[-600px] h-full w-[550px] bg-white shadow-2xl transition-all duration-300 overflow-auto z-50 border-l border-slate-200">
+  <div class="p-6 border-b flex justify-between items-center bg-slate-50">
+    <h3 id="drawerTitle" class="text-xl font-bold text-slate-800">Modify Record</h3>
+    <button id="closeDrawerBtn" class="text-slate-400 hover:text-rose-600 font-bold text-xl transition">✕</button>
   </div>
   <div class="p-6">
     <form id="recordForm" class="space-y-4"></form>
   </div>
 </div>
 
+<!-- Toast Container notification feed -->
 <div id="toast-container" class="fixed bottom-5 right-5 space-y-3 z-50 pointer-events-none"></div>
 
+<script type="module" src="./app.js"></script>
 <script>
-const CONFIG = {
- employees: {
-   endpoint: "/api/employees",
-   idField: "employee_id",
-   fields: ["email", "first_name", "last_name", "department", "job_title"]
- },
- "user-resources": {
-   endpoint: "/api/views",
-   idField: "employee_id",
-   fields: ["employee_id", "department", "email", "first_name", "last_name", "computers", "monitors"]
- },
- "computer-assets": {
-   endpoint: "/api/assets",
-   idField: "asset_id",
-   fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status" , "bitlocker_key" , "assigned_to"]
- },
- "asset-assignments": {
-   endpoint: "/api/assignments",
-   idField: "assignment_id",
-   fields: ["serial_number", "employee_email", "date_issued", "date_returned", "notes"]
- },
- monitors: {
-   endpoint: "/api/monitors",
-   idField: "monitor_id",
-   fields: ["asset_number", "serial_number", "brand", "model", "status"]
- },
- "monitor-assignments": {
-   endpoint: "/api/usermonitors",
-   idField: "id",
-   fields: ["monitor_serial_number", "employee_email", "date_issued", "date_returned"]
- },
- printers: {
-   endpoint: "/api/printers",
-   idField: "printer_id",
-   fields: ["asset_tag", "printer_name", "brand", "model", "status"]
- }
-};
+  document.addEventListener("DOMContentLoaded", () => {
+  // --- Collapsible Submenu Toggle ---
+  const toggleBtn = document.getElementById("printersMenuToggle");
+  const submenu = document.getElementById("printersSubmenu");
+  const arrow = document.getElementById("printersArrow");
 
-let currentModule = "employees";
-let masterData = [];     
-let filteredData = [];   
-let currentPage = 1;
-let pageSize = 50;
-let editId = null;
-
-// Persistent Visibility & Length Mappings
-let visibleFields = [];  
-let fieldWidths = {};    // Structure style map tracking: { fieldName: widthInPxValue }
-
-// Printer Local Module States
-let activePrinterFilter = "all";
-let activePrinterSearch = "";
-
-document.querySelectorAll(".nav-btn").forEach(btn=>{
-  btn.addEventListener("click",()=>{
-      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("bg-slate-800"));
-      btn.classList.add("bg-slate-800");
-      loadModule(btn.dataset.module);
-  });
-});
-
-document.getElementById("newBtn").addEventListener("click", openCreateForm);
-document.getElementById("searchBox").addEventListener("input", (e) => filterTable(e.target.value));
-document.getElementById("pageSizeSelector").addEventListener("change", (e) => {
-  pageSize = parseInt(e.target.value);
-  currentPage = 1;
-  renderTable();
-});
-
-document.getElementById("printer-search-bar").addEventListener("input", (e) => {
-  activePrinterSearch = e.target.value.trim();
-  applyPrinterFiltersAndRender();
-});
-
-const printerFilterBtns = document.querySelectorAll(".printer-filter-btn");
-printerFilterBtns.forEach(btn => {
-  btn.addEventListener("click", () => {
-    printerFilterBtns.forEach(b => {
-      b.className = "printer-filter-btn px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-md transition cursor-pointer";
-    });
-    btn.className = "printer-filter-btn px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded-md border border-blue-200 cursor-pointer";
-    activePrinterFilter = btn.getAttribute("data-filter");
-    applyPrinterFiltersAndRender();
-  });
-});
-
-function toggleColumnDropdown(e) {
-  e.stopPropagation();
-  document.getElementById("columnDropdown").classList.toggle("hidden");
-}
-
-function closeColumnDropdown(e) {
-  const container = document.getElementById("columnSelectorContainer");
-  if (container && !container.contains(e.target)) {
-    document.getElementById("columnDropdown").classList.add("hidden");
-  }
-}
-
-// Global UI Notifications Function
-function showToast(message, type = 'success') {
-  const container = document.getElementById("toast-container");
-  if (!container) return;
-
-  const toast = document.createElement("div");
-  toast.className = `p-4 rounded-xl shadow-lg border text-sm transition-all duration-300 opacity-0 transform translate-y-2 pointer-events-auto flex items-center gap-2 min-w-[280px] max-w-sm `;
-  
-  if (type === 'success') {
-    toast.className += "bg-emerald-50 border-emerald-200 text-emerald-800";
-    toast.innerHTML = `✅ <span>${message}</span>`;
-  } else {
-    toast.className += "bg-rose-50 border-rose-200 text-rose-800";
-    toast.innerHTML = `❌ <span>${message}</span>`;
-  }
-
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.remove("opacity-0", "translate-y-2");
-  }, 10);
-
-  setTimeout(() => {
-    toast.classList.add("opacity-0", "translate-y-2");
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
-}
-
-// Loads Saved states or initializes default settings
-function initializeStorageConfiguration(module) {
-  const config = CONFIG[module];
-  
-  // Load or Setup fields visibility layout arrays
-  const cachedVis = localStorage.getItem(`visibility_${module}`);
-  if (cachedVis) {
-    visibleFields = JSON.parse(cachedVis);
-  } else {
-    visibleFields = [...config.fields];
-  }
-
-  // Load or Setup dynamic field px size mapping tracking widths
-  const cachedWidths = localStorage.getItem(`widths_${module}`);
-  if (cachedWidths) {
-    fieldWidths = JSON.parse(cachedWidths);
-  } else {
-    fieldWidths = {};
-    config.fields.forEach(field => {
-      // Default standard fallbacks lengths
-      fieldWidths[field] = (field === "email" || field === "bitlocker_key") ? 220 : 150;
-    });
-  }
-}
-
-function saveStorageConfiguration(module) {
-  localStorage.setItem(`visibility_${module}`, JSON.stringify(visibleFields));
-  localStorage.setItem(`widths_${module}`, JSON.stringify(fieldWidths));
-}
-
-function renderColumnSelector() {
-  const dropdown = document.getElementById("columnDropdown");
-  const config = CONFIG[currentModule];
-  
-  let html = `<div class="text-xs font-bold uppercase text-slate-400 mb-1">Column Display & Width Settings</div>`;
-  config.fields.forEach(field => {
-    const isChecked = visibleFields.includes(field) ? "checked" : "";
-    const currentWidth = fieldWidths[field] || 150;
-    
-    html += `
-      <div class="p-2 border border-slate-100 rounded-lg bg-slate-50 space-y-1">
-        <label class="flex items-center justify-between cursor-pointer text-sm font-medium text-slate-700">
-          <div class="flex items-center gap-2">
-            <input type="checkbox" data-field="${field}" ${isChecked} onchange="handleColumnToggle(this)" class="rounded text-blue-600 focus:ring-blue-500">
-            <span class="truncate max-w-[140px] text-xs">${field.replaceAll("_", " ").toUpperCase()}</span>
-          </div>
-          <span class="text-[10px] text-slate-400 font-mono" id="label-width-${field}">${currentWidth}px</span>
-        </label>
-        <div class="flex items-center gap-2">
-          <input type="range" min="80" max="400" step="10" value="${currentWidth}" data-field="${field}" oninput="handleWidthSliderChange(this)" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
-        </div>
-      </div>`;
-  });
-  dropdown.innerHTML = html;
-}
-
-function handleColumnToggle(checkbox) {
-  const field = checkbox.dataset.field;
-  if (checkbox.checked) {
-    if (!visibleFields.includes(field)) visibleFields.push(field);
-  } else {
-    visibleFields = visibleFields.filter(f => f !== field);
-  }
-  saveStorageConfiguration(currentModule);
-  renderTable();
-}
-
-function handleWidthSliderChange(slider) {
-  const field = slider.dataset.field;
-  const targetVal = parseInt(slider.value);
-  fieldWidths[field] = targetVal;
-  
-  document.getElementById(`label-width-${field}`).innerText = `${targetVal}px`;
-  
-  saveStorageConfiguration(currentModule);
-  renderTable();
-}
-
-async function loadModule(module , forceRefresh = false) {
-  console.log(`Loading module: ${module} (forceRefresh: ${forceRefresh})`);
-  currentModule = module;
-  currentPage = 1;
-  
-  initializeStorageConfiguration(module);
-
-  document.getElementById("pageTitle").innerText = module.replaceAll("-", " ").toUpperCase();
-
-  if (module === "printers") {
-    document.getElementById("standardHeader").classList.add("hidden");
-    document.getElementById("tableViewWrapper").classList.add("hidden");
-    document.getElementById("printerViewWrapper").classList.remove("hidden");
-
-    // if forceRefresh is true, clear cached data to force network fetch
-    if (forceRefresh) {
-      localStorage.removeItem("printers_data");
-    }
-   
-    // load printer data from localStorage first for offline resilience
-    const cachedPrinters = localStorage.getItem("printers_data");
-    if (cachedPrinters) {
-      masterData = JSON.parse(cachedPrinters);
-      applyPrinterFiltersAndRender();
-      return;  // Skip network fetch if cached data exists
-    }
-
-  } else {
-    document.getElementById("standardHeader").classList.remove("hidden");
-    document.getElementById("tableViewWrapper").classList.remove("hidden");
-    document.getElementById("printerViewWrapper").classList.add("hidden");
-    document.getElementById("newBtn").style.display = (module === "user-resources") ? "none" : "block";
-  }
-
-  try {
-    const response = await fetch(CONFIG[module].endpoint);
-    if (!response.ok) throw new Error("Failed network validation query");
-    masterData = await response.json();
-    filteredData = [...masterData];
-    
-    if (module === "printers") {
-      // cache the result to localStorage for offline resilience first inset lastseen on each printer object
-      masterData.forEach(printer => {
-        printer.last_seen = new Date().toISOString();
-      });
-
-      localStorage.setItem("printers_data", JSON.stringify(masterData));
-      applyPrinterFiltersAndRender();
-    } else {
-      renderColumnSelector();
-      renderTable();
-    }
-  } catch(err){
-    console.error(err);
-    if (module === "printers") {
-      document.getElementById("printer-grid").innerHTML = `
-        <div class="col-span-full text-center py-12 bg-white rounded-xl border border-rose-200 text-rose-500">Failed to load printer fleet metrics.</div>`;
-    } else {
-      document.getElementById("tableBody").innerHTML = `
-        <tr><td colspan="100" class="p-8 text-center text-red-500">Failed to load data structure</td></tr>`;
-    }
-  }
-}
-
-/* ==================== TABLE SYSTEM (VIEW A) ==================== */
-function renderTable(){
- const config = CONFIG[currentModule];
- document.getElementById("recordCount").innerText = `(${filteredData.length})`;
-
- const totalRecords = filteredData.length;
- const totalPages = Math.ceil(totalRecords / pageSize) || 1;
- if (currentPage > totalPages) currentPage = totalPages;
-
- const startIndex = (currentPage - 1) * pageSize;
- const endIndex = Math.min(startIndex + pageSize, totalRecords);
- const pageData = filteredData.slice(startIndex, endIndex);
-
- // 1. Render Table Headers with explicitly calculated dynamic inline widths
- let head = "<tr>";
- head += `<th class="p-2 text-left bg-slate-200" style="width: 60px;">#</th>`;
- visibleFields.forEach(field => {
-    const w = fieldWidths[field] || 150;
-    head += `<th class="p-2 text-left text-xs bg-slate-200 font-bold truncate" style="width: ${w}px;" title="${field.replaceAll("_", " ").toUpperCase()}">${field.replaceAll("_", " ").toUpperCase()}</th>`;
- });
- head += `<th class="p-3 text-center bg-slate-200" style="width: 100px;">Actions</th></tr>`;
- document.getElementById("tableHead").innerHTML = head;
-
- // 2. Render Table Rows
- let body = "";
- if (pageData.length === 0) {
-   body = `<tr><td colspan="100" class="p-8 text-center text-slate-400">No matching records found</td></tr>`;
- } else {
-   pageData.forEach((row, index) => {
-     body += "<tr class='border-t hover:bg-slate-50 align-top'>";
-     body += `<td class="p-2 font-medium text-xs">${startIndex + index + 1}</td>`;
-
-     visibleFields.forEach(field => {
-        if (Array.isArray(row[field])) {
-           if (row[field].length === 0) {
-              body += `<td class="p-2 text-slate-400 italic text-[11px] truncate">None Assigned</td>`;
-           } else {
-              let cellMarkup = `<td class="p-2 space-y-2 overflow-hidden">`;
-              row[field].forEach(item => {
-                 cellMarkup += `
-                    <div class="bg-slate-100 p-1.5 rounded border border-slate-200 text-[11px]">
-                       <span class="font-bold text-slate-700 block truncate">${item.brand || 'Unknown'} ${item.model || ''}</span>
-                       <div class="text-[10px] text-slate-500 truncate">Tag: ${item.asset_number || 'N/A'}</div>
-                       <div class="text-[10px] text-slate-500 truncate">S/N: ${item.serial_number || 'N/A'}</div>
-                    </div>`;
-              });
-              cellMarkup += `</td>`;
-              body += cellMarkup;
-           }
-        } else {
-           body += `<td class="p-2 text-xs truncate" title="${row[field] ?? ''}">${row[field] ?? ""}</td>`;
-        }
-     });
-
-     body += `
-        <td class="p-2 text-center">
-          <button onclick="editRecord('${row[config.idField]}')" class="bg-amber-500 text-white px-2.5 py-1 rounded text-xs hover:bg-amber-600 transition">Edit</button>
-        </td>`;
-     body += "</tr>";
-   });
- }
- document.getElementById("tableBody").innerHTML = body;
-
- document.getElementById("paginationInfo").innerText = totalRecords > 0 
-    ? `Showing ${startIndex + 1} to ${endIndex} of ${totalRecords} entries` 
-    : `Showing 0 to 0 of 0 entries`;
-
- let btnHtml = `
-   <button onclick="changePage(1)" ${currentPage === 1 ? 'disabled' : ''} class="px-3 py-1 border rounded bg-white text-sm disabled:opacity-50 hover:bg-slate-100">«</button>
-   <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} class="px-3 py-1 border rounded bg-white text-sm disabled:opacity-50 hover:bg-slate-100">‹</button>
- `;
- 
- let startPage = Math.max(1, currentPage - 2);
- let endPage = Math.min(totalPages, startPage + 4);
- if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-
- {
-   for (let p = startPage; p <= endPage; p++) {
-     btnHtml += `
-       <button onclick="changePage(${p})" class="px-3 py-1 border rounded text-sm ${currentPage === p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-slate-100'}">${p}</button>
-     `;
-   }
- }
-
- btnHtml += `
-   <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} class="px-3 py-1 border rounded bg-white text-sm disabled:opacity-50 hover:bg-slate-100">›</button>
-   <button onclick="changePage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''} class="px-3 py-1 border rounded bg-white text-sm disabled:opacity-50 hover:bg-slate-100">»</button>
- `;
- document.getElementById("paginationButtons").innerHTML = btnHtml;
-}
-
-function changePage(targetPage) {
-  currentPage = targetPage;
-  renderTable();
-}
-
-function filterTable(search){
- const config = CONFIG[currentModule];
- currentPage = 1;
-
- filteredData = masterData.filter(row=>{
-   return config.fields.some(field=>{
-      if(Array.isArray(row[field])){
-         return row[field].some(subItem => {
-            return Object.values(subItem).some(val => 
-               String(val ?? "").toLowerCase().includes(search.toLowerCase())
-            );
-         });
+  if (toggleBtn && submenu) {
+    toggleBtn.addEventListener("click", () => {
+      const isHidden = submenu.classList.toggle("hidden");
+      if (arrow) {
+        arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(180deg)";
       }
-      return String(row[field] ?? "").toLowerCase().includes(search.toLowerCase());
-   });
- });
- renderTable();
-}
-
-// add a printer javascript function to apply both search and filter criteria and render the printer grid
-
-
-/* ==================== FORM PROCESSORS ==================== */
-function openCreateForm(){
- editId = null;
- const config = CONFIG[currentModule];
- let html = "";
-
- config.fields.forEach(field=>{
-   if(field === "computers" || field === "monitors") return;
-   html += `
-      <div>
-        <label class="block mb-1 font-medium text-sm text-slate-700">${field.replaceAll('_', ' ').toUpperCase()}</label>
-        <input name="${field}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-      </div>`;
- });
-
- html += `<button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">Save Record</button>`;
- document.getElementById("recordForm").innerHTML = html;
- document.getElementById("recordForm").onsubmit = saveRecord;
- openDrawer("Create Record");
-}
-
-function editRecord(id){
- const config = CONFIG[currentModule];
- const row = masterData.find(x => String(x[config.idField]) === String(id));
- editId = id;
- let html = "";
-
- config.fields.forEach(field=>{
-   if(field === "computers" || field === "monitors") return;
-   html += `
-      <div>
-        <label class="block mb-1 font-medium text-sm text-slate-700">${field.replaceAll('_', ' ').toUpperCase()}</label>
-        <input name="${field}" value="${row[field] ?? ""}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-      </div>`;
- });
-
- html += `<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition">Update Record</button>`;
- document.getElementById("recordForm").innerHTML = html;
- document.getElementById("recordForm").onsubmit = updateRecord;
- openDrawer("Edit Record");
-}
-
-async function saveRecord(e){
-  e.preventDefault();
-  const payload = Object.fromEntries(new FormData(e.target));
-  
-  try {
-    const response = await fetch(CONFIG[currentModule].endpoint, {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(payload)
     });
-    
-    if (!response.ok) {
-      throw new Error(`Server returned code ${response.status}: ${response.statusText}`);
-    }
-    
-    showToast("Record successfully created!", "success");
-    closeDrawer();
-    loadModule(currentModule);
-  } catch (err) {
-    console.error(err);
-    showToast(`Failed to create record: ${err.message}`, "error");
   }
-}
 
-async function updateRecord(e){
-  e.preventDefault();
-  const payload = Object.fromEntries(new FormData(e.target));
-  
-  try {
-    console.log(`${CONFIG[currentModule].endpoint}}`);
-    const response = await fetch(`${CONFIG[currentModule].endpoint}`, {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(payload)
+  // --- Active Class Handling for Nav Buttons ---
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".nav-btn").forEach((b) => {
+        b.classList.remove("bg-slate-800", "text-white", "font-semibold");
+      });
+      btn.classList.add("bg-slate-800", "text-white", "font-semibold");
+      activePrinterId = null;
+      loadModule(btn.dataset.module);
     });
-    
-    if (!response.ok) {
-      throw new Error(`Server returned code ${response.status}: ${response.statusText}`);
-    }
-    
-    showToast("Record modifications successfully updated!", "success");
-    closeDrawer();
-    loadModule(currentModule);
-  } catch (err) {
-    console.error(err);
-    showToast(`Failed to apply updates: ${err.message}`, "error");
-  }
-}
+  });
 
-function openDrawer(title){
- document.getElementById("drawerTitle").innerText = title;
- document.getElementById("drawer").style.right = "0";
-}
-
-function closeDrawer(){
- document.getElementById("drawer").style.right = "-600px";
-}
-
-// Initial Bootstrap Run Entry point
-loadModule("employees");
+  // ... rest of DOMContentLoaded setup ...
+});
 </script>
-
-<script src="./printerView.js"  ></script>
-
 </body>
-</html> 
+</html>

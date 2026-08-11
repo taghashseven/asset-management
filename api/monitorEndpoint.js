@@ -1,7 +1,8 @@
 import express from "express";
 import {
   getAllMonitors,
-  createMonitor
+  createMonitor,
+  upsertMonitor
 } from "../database/monitor.js";
 
 const router = express.Router();
@@ -25,7 +26,7 @@ router.get("/", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   try {
-    const monitorId = await createMonitor(req.body);
+    const monitorId = await upsertMonitor(req.body);
 
     res.status(201).json({
       success: true,
