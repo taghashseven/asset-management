@@ -14,6 +14,8 @@ export const getUserMonitorsAndAssets = async () => {
         ca.serial_number AS computer_serial_number,
         ca.brand AS computer_brand,
         ca.model AS computer_model,
+        ca.description AS computer_description,
+        ca.hostname AS computer_hostname,
 
         m.asset_number AS monitor_asset_number,
         m.serial_number AS monitor_serial_number,

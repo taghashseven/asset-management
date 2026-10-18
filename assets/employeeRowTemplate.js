@@ -10,6 +10,7 @@ import {
 
 export function render(filteredData, currentPage, pageSize) {
   console.log("Rendering custom employee view layout configuration...");
+   
 
   const totalRecords = filteredData.length;
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
@@ -140,7 +141,7 @@ export function render(filteredData, currentPage, pageSize) {
   }
 
   document.getElementById("tableBody").innerHTML = bodyMarkup;
-  document.getElementById("recordCount").innerText = `(${filteredData.length})`;
+
 
   // Edit Button Event Listeners
   document.querySelectorAll(".edit-action-btn").forEach(b => {

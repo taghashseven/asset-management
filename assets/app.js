@@ -20,7 +20,7 @@ export const CONFIG = {
   "user-resources": {
     endpoint: "/api/views",
     idField: "employee_id",
-    fields: ["employee_id", "department", "email", "first_name", "last_name", "computers", "monitors", "forms"],
+    fields: ["employee_id", "department", "email", "first_name", "last_name", "computers", "monitors", "forms" , "computer_hostname"],
     fieldTypes: {
       computers: { 
         type: "array", 
@@ -82,10 +82,14 @@ export const CONFIG = {
 
   "computer-assets": {
     endpoint: "/api/assets",
+    deleteEndPoint : "/api/assets" ,
     idField: "asset_id",
-    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location" , "description" ,  "specs","images" , "first_name" , "last_name" , "job_title"],
+    fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location" , "description" , "hostname"  , "specs","images" , "first_name" , "last_name" , "job_title"],
     fieldTypes: {
-      status: ["Available", "Deployed", "In Repair", "Scrapped"],
+      status: {
+        type: "select",
+        options: ["Available", "Assigned", "Repair", "Retired"]
+      },
       bitlocker_key: {
         type: "text",
         truncate: 15
@@ -99,7 +103,8 @@ export const CONFIG = {
       } 
       
     },
-    customViewFile: null
+    customViewFile: null ,
+    delete : true 
   },
 
   "asset-assignments": {
@@ -229,6 +234,11 @@ export const CONFIG = {
     standalone: true
   } ,
 
+   "form001": {
+    customViewFile: "./form001.js",
+    standalone: true
+  } ,
+
   "dashboard": {
     customViewFile: "./overviewDashboardView.js",
     standalone: true
@@ -246,7 +256,7 @@ export let activePrinterId = null;
 export let masterData = [];
 export let filteredData = [];
 export let currentPage = 1;
-export let pageSize = 50;
+export let pageSize = 100;
 export let visibleFields = [];
 export let fieldWidths = {};
 
@@ -572,6 +582,7 @@ export function renderDefaultTable(data = [], config = {}) {
     return `<th class="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200" ${widthStyle}>${title}</th>`;
   }).join('') + `<th class="px-4 py-3 text-right text-xs font-bold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200" style="width: 100px;">Actions</th>`;
 
+   document.getElementById("recordCount").innerText = `(${data.length})`;
   // Build Table Data Rows matching filtered visible headers
   const dataRowsHTML = data.map((row) => {
     const primaryKey = config.idField || Object.keys(row)[0];
@@ -764,24 +775,147 @@ function changePage(targetPage) {
   renderRouter();
 }
 
+/**
+ * Enhanced Smart Search & Filtering Engine
+ * Supports:
+ *  - Field specific search: "status:Deployed" or "images:png"
+ *  - File / Attachment checks: "images:empty", "file_path:pdf"
+ *  - Empty / Blank checks: "bitlocker_key:empty", "notes:blank"
+ *  - Quoted strings & OR logic
+ */
 export function filterTable(searchQuery) {
   const config = CONFIG[currentModule];
-  const query = searchQuery.toLowerCase().trim();
+  const query = searchQuery.trim();
   currentPage = 1;
 
+  if (!query) {
+    filteredData = [...masterData];
+    renderRouter();
+    return;
+  }
+
+  // Parse query into structured tokens
+  const tokens = parseSearchTokens(query);
+
   filteredData = masterData.filter((row) => {
-    return config.fields.some((field) => {
-      const value = row[field];
-      if (Array.isArray(value)) {
-        return value.some((subItem) =>
-          Object.values(subItem || {}).some((val) => String(val ?? "").toLowerCase().includes(query))
-        );
-      }
-      return String(value ?? "").toLowerCase().includes(query);
+    // Split tokens into OR groups
+    const orGroups = splitTokensByOr(tokens);
+
+    return orGroups.some((groupTokens) => {
+      // Every token in a group must evaluate to true (AND logic)
+      return groupTokens.every((token) => evaluateTokenCondition(row, token, config));
     });
   });
 
   renderRouter();
+}
+
+/* Helper to parse structured query string into token objects */
+function parseSearchTokens(query) {
+  const tokenRegex = /(?:(\w+):)?(?:"([^"]+)"|(\S+))/g;
+  const tokens = [];
+  let match;
+
+  while ((match = tokenRegex.exec(query)) !== null) {
+    const rawKey = match[1]?.toLowerCase();
+    const value = match[2] ?? match[3];
+
+    if (value.toUpperCase() === "OR") {
+      tokens.push({ type: "OPERATOR", value: "OR" });
+    } else {
+      tokens.push({
+        type: "CONDITION",
+        field: rawKey || null,
+        value: value
+      });
+    }
+  }
+  return tokens;
+}
+
+/* Helper to group tokens separated by OR operators */
+function splitTokensByOr(tokens) {
+  const groups = [[]];
+  tokens.forEach((token) => {
+    if (token.type === "OPERATOR" && token.value === "OR") {
+      groups.push([]);
+    } else {
+      groups[groups.length - 1].push(token);
+    }
+  });
+  return groups.filter((g) => g.length > 0);
+}
+
+/* Helper to evaluate a token condition against a row record */
+function evaluateTokenCondition(row, token, config) {
+  const { field, value } = token;
+  const lowerVal = value.toLowerCase();
+  const isEmptyCheck = ["empty", "null", "blank", "none"].includes(lowerVal);
+
+  // --- Case 1: Field-specific search (e.g. "images:empty", "file_path:pdf") ---
+  if (field) {
+    const actualField = config.fields.find(
+      (f) => f.toLowerCase() === field || f.replaceAll("_", "").toLowerCase() === field
+    );
+
+    if (!actualField) return false;
+
+    const rowVal = row[actualField];
+
+    if (isEmptyCheck) {
+      return isFieldValueEmpty(rowVal);
+    }
+
+    return checkValueMatch(rowVal, lowerVal);
+  }
+
+  // --- Case 2: Global search across all active fields ---
+  if (isEmptyCheck) {
+    return config.fields.some((f) => isFieldValueEmpty(row[f]));
+  }
+
+  return config.fields.some((f) => checkValueMatch(row[f], lowerVal));
+}
+
+/* Checks whether a given field value or file list is empty/blank */
+function isFieldValueEmpty(val) {
+  if (val === null || val === undefined) return true;
+  if (typeof val === "string" && val.trim() === "") return true;
+  if (Array.isArray(val)) {
+    if (val.length === 0) return true;
+    // Check if array contains empty items or null paths
+    return val.every((item) => {
+      if (typeof item === "object" && item !== null) {
+        return Object.values(item).every((v) => v === null || v === undefined || String(v).trim() === "");
+      }
+      return item === null || item === undefined || String(item).trim() === "";
+    });
+  }
+  if (typeof val === "object" && Object.keys(val).length === 0) return true;
+  return false;
+}
+
+/* Deep search utility that traverses primitive values, arrays, and file objects */
+function checkValueMatch(rowVal, queryVal) {
+  if (rowVal === null || rowVal === undefined) return false;
+
+  // Handles File Arrays / Image Objects (e.g., [{ file_path: "/uploads/img.jpg" }])
+  if (Array.isArray(rowVal)) {
+    return rowVal.some((item) => {
+      if (typeof item === "object" && item !== null) {
+        return Object.values(item).some((val) => checkValueMatch(val, queryVal));
+      }
+      return String(item).toLowerCase().includes(queryVal);
+    });
+  }
+
+  // Handles Nested Objects / File Spec maps
+  if (typeof rowVal === "object") {
+    return Object.values(rowVal).some((val) => checkValueMatch(val, queryVal));
+  }
+
+  // Primitive strings, numbers, file paths
+  return String(rowVal).toLowerCase().includes(queryVal);
 }
 
 /* ==========================================================================
@@ -792,6 +926,27 @@ export function generateFormFieldHTML(field, value = "", config = {}, recordId =
   const types = config.fieldTypes || {};
   const fieldConfig = types[field];
   const labelText = field.replaceAll("_", " ").toUpperCase();
+
+  // --- 1. SELECT DROPDOWN HANDLER ---
+  const isSelectType = typeof fieldConfig === "object" && fieldConfig?.type === "select";
+  const selectOptions = isSelectType ? fieldConfig.options : (Array.isArray(fieldConfig) ? fieldConfig : null);
+
+  if (selectOptions) {
+    const optionsHTML = selectOptions.map((opt) => {
+      const isSelected = String(value) === String(opt) ? "selected" : "";
+      return `<option value="${opt}" ${isSelected}>${opt}</option>`;
+    }).join("");
+
+    return `
+      <div>
+        <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
+        <select name="${field}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+          <option value="">-- Select ${labelText} --</option>
+          ${optionsHTML}
+        </select>
+      </div>
+    `;
+  }
 
   // --- 1. ARRAY / NESTED IMAGE FIELD ---
   if (typeof fieldConfig === "object" && fieldConfig.type === "array") {
@@ -1347,3 +1502,29 @@ window.navigateAndFilter = navigateAndFilter;
 window.editRecord = editRecord;
 window.deleteRecord = deleteRecord;
 window.showAboutModal = () => console.log("Displaying Modal for module:", currentModule);
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Existing DOM listeners...
+  
+  // Search Help Modal Toggle Handlers
+  const helpBtn = document.getElementById("searchHelpBtn");
+  const helpDropdown = document.getElementById("searchHelpDropdown");
+  const closeHelpBtn = document.getElementById("closeSearchHelpBtn");
+
+  if (helpBtn && helpDropdown) {
+    helpBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      helpDropdown.classList.toggle("hidden");
+    });
+
+    closeHelpBtn?.addEventListener("click", () => {
+      helpDropdown.classList.add("hidden");
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!helpDropdown.contains(e.target) && e.target !== helpBtn) {
+        helpDropdown.classList.add("hidden");
+      }
+    });
+  }
+});

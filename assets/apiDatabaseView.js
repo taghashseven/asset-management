@@ -9,7 +9,7 @@ export function render(container) {
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8-1.79-8-4"></path></svg>
                     </div>
                     <div>
-                        <h2 class="text-xl font-bold text-slate-800 tracking-tight">Database Explorer & Single-Table ER Visualizer</h2>
+                        <h2 class="text-xl font-bold text-slate-800 tracking-tight">Dynamic Database Explorer & ER Visualizer</h2>
                         <p id="dbSummarySubtitle" class="text-xs text-slate-500">Connecting to database engine...</p>
                     </div>
                 </div>
@@ -61,8 +61,8 @@ export function render(container) {
                                 <span class="text-blue-400 font-mono text-base">⚡</span>
                                 <h3 class="font-bold text-xs uppercase tracking-wider text-slate-300 font-mono">SQL Execution Console</h3>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <button id="btnShortcutSelect" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-mono transition">SELECT * FROM computer_assets</button>
+                            <div class="flex items-center gap-2" id="queryShortcutsContainer">
+                                <button id="btnShortcutSelect" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-mono transition">SELECT Active Table</button>
                                 <button id="btnShortcutClear" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 px-2.5 py-1 rounded-lg border border-slate-700/60 font-mono transition">Clear</button>
                             </div>
                         </div>
@@ -72,7 +72,7 @@ export function render(container) {
                                 id="sqlQueryInput" 
                                 rows="4" 
                                 class="w-full bg-transparent text-emerald-400 font-mono text-sm leading-relaxed p-2 focus:outline-none resize-y placeholder-slate-700"
-                                placeholder="-- Select a table on the left or write custom SQL queries...&#10;SELECT * FROM computer_assets WHERE status = 'Available';"
+                                placeholder="-- Select a table from the sidebar or type dynamic custom SQL queries...&#10;SELECT * FROM your_table LIMIT 50;"
                                 spellcheck="false"
                             ></textarea>
                         </div>
@@ -130,7 +130,7 @@ export function render(container) {
                 <div class="absolute top-4 left-4 z-20 bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 shadow-lg backdrop-blur flex items-center gap-3">
                     <div>
                         <h3 class="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">Single Table ER Focus</h3>
-                        <p class="text-[11px] text-slate-400 mt-0.5">Showing direct relationships only</p>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Showing dynamic direct relationships</p>
                     </div>
                     <div class="border-l border-slate-700 pl-3">
                         <label class="text-[10px] text-slate-400 uppercase font-mono block mb-1">Select Focus Table:</label>
@@ -181,7 +181,7 @@ export function render(container) {
     const dbSummarySubtitle = container.querySelector("#dbSummarySubtitle");
     const btnRefreshSchema = container.querySelector("#btnRefreshSchema");
 
-    // Views & Navigation
+    // Navigation and Canvas Elements
     const tabBtnConsole = container.querySelector("#tabBtnConsole");
     const tabBtnVisualizer = container.querySelector("#tabBtnVisualizer");
     const viewConsole = container.querySelector("#viewConsole");
@@ -191,10 +191,10 @@ export function render(container) {
     const erCanvasViewport = container.querySelector("#erCanvasViewport");
     const focusTableSelect = container.querySelector("#focusTableSelect");
 
-    // Initial Load
+    // Initialize Schema
     loadSchemaSummary();
 
-    // Event Handlers for Navigation Tabs
+    // Event Handlers
     tabBtnConsole.addEventListener("click", () => {
         tabBtnConsole.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-600 shadow-sm";
         tabBtnVisualizer.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900";
@@ -237,8 +237,12 @@ export function render(container) {
     });
 
     container.querySelector("#btnShortcutSelect").addEventListener("click", () => {
-        queryInput.value = "SELECT * FROM computer_assets LIMIT 50;";
-        queryInput.focus();
+        const targetTable = selectedFocusTable || getNormalizedTablesList(currentSchemaData)[0]?.name;
+        if (targetTable) {
+            queryInput.value = `SELECT * FROM ${targetTable} LIMIT 50;`;
+            activeTableLabel.innerText = `[${targetTable}]`;
+            queryInput.focus();
+        }
     });
 
     container.querySelector("#btnShortcutClear").addEventListener("click", () => {
@@ -260,7 +264,7 @@ export function render(container) {
         }
     });
 
-    // Fetch Database Schema
+    // Dynamic Schema Extraction Engine
     async function loadSchemaSummary() {
         tablesContainer.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading schema...</div>`;
         
@@ -269,6 +273,12 @@ export function render(container) {
             if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch schema.`);
             
             currentSchemaData = await response.json();
+            const tables = getNormalizedTablesList(currentSchemaData);
+            
+            if (tables.length > 0 && !selectedFocusTable) {
+                selectedFocusTable = tables[0].name;
+            }
+
             renderSidebarSchema(currentSchemaData);
             populateFocusDropdown(currentSchemaData);
             
@@ -287,48 +297,53 @@ export function render(container) {
     function populateFocusDropdown(summaryData) {
         const tables = getNormalizedTablesList(summaryData);
         focusTableSelect.innerHTML = tables.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
-        if (tables.length > 0 && !selectedFocusTable) {
-            selectedFocusTable = tables[0].name;
+        if (selectedFocusTable) {
+            focusTableSelect.value = selectedFocusTable;
         }
     }
 
     function getNormalizedTablesList(summaryData) {
-        const tablesObj = summaryData.tables || {};
-        if (Array.isArray(tablesObj)) return tablesObj;
+        if (!summaryData) return [];
+        const tablesObj = summaryData.tables || summaryData;
+        
+        if (Array.isArray(tablesObj)) {
+            return tablesObj.map(t => typeof t === "string" ? { name: t, columns: [] } : t);
+        }
+        
         return Object.keys(tablesObj).map(key => ({
             name: key,
-            columns: tablesObj[key].columns || []
+            columns: Array.isArray(tablesObj[key].columns) 
+                ? tablesObj[key].columns 
+                : (Array.isArray(tablesObj[key]) ? tablesObj[key] : [])
         }));
     }
 
-    // Build Sidebar Table List
+    // Dynamic Sidebar Rendering
     function renderSidebarSchema(summaryData) {
         const tables = getNormalizedTablesList(summaryData);
         tableCountBadge.innerText = tables.length;
-        dbSummarySubtitle.innerText = `SQLite Database • ${tables.length} Tables Connected`;
+        dbSummarySubtitle.innerText = `Database Engine • ${tables.length} Table(s) Discovered`;
 
         if (tables.length === 0) {
-            tablesContainer.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">No tables returned from schema.</div>`;
+            tablesContainer.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">No tables found in database.</div>`;
             return;
         }
 
-        tablesContainer.innerHTML = tables.map(item => {
-            return `
-                <button 
-                    data-table="${item.name}" 
-                    class="btn-table-item w-full text-left p-2.5 rounded-xl hover:bg-blue-50/80 transition group flex items-center justify-between border border-transparent hover:border-blue-100"
-                >
-                    <div class="flex items-center gap-2.5 min-w-0">
-                        <span class="text-base group-hover:scale-110 transition-transform">📄</span>
-                        <div class="truncate">
-                            <div class="text-xs font-semibold text-slate-700 font-mono group-hover:text-blue-600 truncate">${item.name}</div>
-                            <div class="text-[10px] text-slate-400 font-mono">${(item.columns || []).length} column(s)</div>
-                        </div>
+        tablesContainer.innerHTML = tables.map(item => `
+            <button 
+                data-table="${item.name}" 
+                class="btn-table-item w-full text-left p-2.5 rounded-xl hover:bg-blue-50/80 transition group flex items-center justify-between border border-transparent hover:border-blue-100"
+            >
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="text-base group-hover:scale-110 transition-transform">📄</span>
+                    <div class="truncate">
+                        <div class="text-xs font-semibold text-slate-700 font-mono group-hover:text-blue-600 truncate">${item.name}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">${(item.columns || []).length} column(s)</div>
                     </div>
-                    <span class="text-[10px] text-blue-600 font-mono opacity-0 group-hover:opacity-100 transition-opacity">FETCH</span>
-                </button>
-            `;
-        }).join('');
+                </div>
+                <span class="text-[10px] text-blue-600 font-mono opacity-0 group-hover:opacity-100 transition-opacity">FETCH</span>
+            </button>
+        `).join('');
 
         container.querySelectorAll(".btn-table-item").forEach(btn => {
             btn.addEventListener("click", () => {
@@ -342,7 +357,7 @@ export function render(container) {
         });
     }
 
-    // Single-Table Focused ER Diagram Renderer
+    // Dynamic Relational Graph Builder
     function renderFocusedErDiagram() {
         erNodesContainer.innerHTML = "";
         if (!currentSchemaData) return;
@@ -351,14 +366,14 @@ export function render(container) {
         const focusTableObj = allTables.find(t => t.name === selectedFocusTable);
 
         if (!focusTableObj) {
-            erNodesContainer.innerHTML = `<div class="text-slate-400 text-xs text-center mt-20">Select a table to view its relationship diagram.</div>`;
+            erNodesContainer.innerHTML = `<div class="text-slate-400 text-xs text-center mt-20">Select a target table to visualize its relational tree.</div>`;
             return;
         }
 
-        // Identify Related Tables (Outbound FKs & Inbound Foreign References)
         const relatedTables = [];
-        const relationships = []; // Store relation metadata
+        const relationships = [];
 
+        // Discover Dynamic Foreign Relationships
         allTables.forEach(otherTbl => {
             if (otherTbl.name === focusTableObj.name) return;
 
@@ -366,9 +381,10 @@ export function render(container) {
 
             // Check if focus table references other table
             (focusTableObj.columns || []).forEach(col => {
-                const colName = typeof col === "string" ? col : (col.name || "");
+                const colName = typeof col === "string" ? col : (col.name || col.title || "");
                 const targetSingular = otherTbl.name.replace(/s$/, "");
-                if (colName === `${targetSingular}_id` || (colName === "serial_number" && otherTbl.name === "computer_assets")) {
+                
+                if (colName === `${targetSingular}_id` || colName === `${otherTbl.name}_id`) {
                     isRelated = true;
                     relationships.push({ from: focusTableObj.name, to: otherTbl.name, key: colName });
                 }
@@ -376,9 +392,10 @@ export function render(container) {
 
             // Check if other table references focus table
             (otherTbl.columns || []).forEach(col => {
-                const colName = typeof col === "string" ? col : (col.name || "");
+                const colName = typeof col === "string" ? col : (col.name || col.title || "");
                 const focusSingular = focusTableObj.name.replace(/s$/, "");
-                if (colName === `${focusSingular}_id` || (colName === "serial_number" && focusTableObj.name === "computer_assets")) {
+                
+                if (colName === `${focusSingular}_id` || colName === `${focusTableObj.name}_id`) {
                     isRelated = true;
                     relationships.push({ from: otherTbl.name, to: focusTableObj.name, key: colName });
                 }
@@ -389,7 +406,7 @@ export function render(container) {
             }
         });
 
-        // Compute Radial Layout (Focus Center + Circle of Relatives)
+        // Radial Layout Computation
         const viewportWidth = erCanvasViewport.clientWidth || 900;
         const viewportHeight = erCanvasViewport.clientHeight || 700;
 
@@ -397,10 +414,8 @@ export function render(container) {
         const centerY = Math.max(250, viewportHeight / 2 - 140);
         const radius = 320;
 
-        // Render Center Node (Focus Table)
         renderTableCard(focusTableObj, centerX, centerY, true);
 
-        // Render Peripheral Nodes
         relatedTables.forEach((relTbl, idx) => {
             const angle = (2 * Math.PI * idx) / relatedTables.length;
             const px = centerX + radius * Math.cos(angle);
@@ -411,7 +426,6 @@ export function render(container) {
 
         const activeTableSet = [focusTableObj, ...relatedTables];
         
-        // Attach Drag events to all rendered nodes
         activeTableSet.forEach(tbl => {
             const el = container.querySelector(`#node-${tbl.name}`);
             if (el) makeDraggable(el, relationships);
@@ -420,7 +434,6 @@ export function render(container) {
         syncCanvasSizeAndRedraw(relationships);
     }
 
-    // Helper to render individual table card
     function renderTableCard(tbl, posX, posY, isFocus) {
         const node = document.createElement("div");
         node.id = `node-${tbl.name}`;
@@ -434,10 +447,10 @@ export function render(container) {
         node.style.top = `${posY}px`;
 
         const columnsHtml = (tbl.columns || []).map(c => {
-            const colName = typeof c === "string" ? c : (c.name || c.cid);
+            const colName = typeof c === "string" ? c : (c.name || c.cid || c.field || "");
             const colType = c.type ? `<span class="text-[10px] text-slate-500 font-mono">${c.type}</span>` : '';
             const isPk = c.pk || colName.endsWith("_id") || colName === "id";
-            const isFk = colName.includes("_id") && colName !== `${tbl.name.replace(/s$/, '')}_id` && colName !== "asset_id";
+            const isFk = colName.includes("_id") && !isPk;
 
             let keyBadge = '';
             if (isPk) keyBadge = `<span class="text-[9px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded font-mono font-bold">PK</span>`;
@@ -470,13 +483,8 @@ export function render(container) {
         erNodesContainer.appendChild(node);
     }
 
-    // Calculates dynamic bounding anchor edges
     function getCardBounds(node) {
         return {
-            x: node.offsetLeft,
-            y: node.offsetTop,
-            w: node.offsetWidth,
-            h: node.offsetHeight,
             left: { x: node.offsetLeft, y: node.offsetTop + node.offsetHeight / 2, dir: "left" },
             right: { x: node.offsetLeft + node.offsetWidth, y: node.offsetTop + node.offsetHeight / 2, dir: "right" },
             top: { x: node.offsetLeft + node.offsetWidth / 2, y: node.offsetTop, dir: "top" },
@@ -488,8 +496,8 @@ export function render(container) {
         const boundsA = getCardBounds(nodeA);
         const boundsB = getCardBounds(nodeB);
 
-        const anchorsA = [boundsA.left, boundsA.right, boundsA.top, boundsA.bottom];
-        const anchorsB = [boundsB.left, boundsB.right, boundsB.top, boundsB.bottom];
+        const anchorsA = Object.values(boundsA);
+        const anchorsB = Object.values(boundsB);
 
         let minDistance = Infinity;
         let bestPair = { start: anchorsA[0], end: anchorsB[0] };
@@ -507,7 +515,6 @@ export function render(container) {
         return bestPair;
     }
 
-    // Draw Connector Lines between focused table & relatives
     function drawAdaptiveRelationships(relationships) {
         const markers = erSvgCanvas.querySelector("defs");
         erSvgCanvas.innerHTML = "";
@@ -544,9 +551,7 @@ export function render(container) {
         else if (end.dir === "top") cp2y -= offset;
         else if (end.dir === "bottom") cp2y += offset;
 
-        const dStr = `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
-
-        path.setAttribute("d", dStr);
+        path.setAttribute("d", `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`);
         path.setAttribute("stroke", "#3b82f6");
         path.setAttribute("stroke-width", "2.5");
         path.setAttribute("stroke-dasharray", "5 4");
@@ -607,12 +612,12 @@ export function render(container) {
         });
     }
 
-    // Execute Custom Query
+    // Dynamic Execution Requests
     async function executeSqlQuery() {
         const queryText = queryInput.value.trim();
         if (!queryText) return;
 
-        setLoadingState("Executing SQL query...");
+        setLoadingState("Executing query...");
         const startTime = performance.now();
 
         try {
@@ -622,19 +627,16 @@ export function render(container) {
                 body: JSON.stringify({ query: queryText })
             });
 
-            const endTime = performance.now();
-            const executionDuration = (endTime - startTime).toFixed(2);
+            const duration = (performance.now() - startTime).toFixed(2);
             const data = await response.json();
-
-            handleApiResponse(response, data, executionDuration);
+            handleApiResponse(response, data, duration);
         } catch (err) {
             handleApiError(err.message);
         }
     }
 
-    // Fetch Table Content
     async function fetchTableContent(tableName) {
-        setLoadingState(`Fetching data for '${tableName}'...`);
+        setLoadingState(`Fetching contents for '${tableName}'...`);
         const startTime = performance.now();
 
         try {
@@ -644,21 +646,17 @@ export function render(container) {
                 body: JSON.stringify({ tableName })
             });
 
-            const endTime = performance.now();
-            const executionDuration = (endTime - startTime).toFixed(2);
+            const duration = (performance.now() - startTime).toFixed(2);
             const data = await response.json();
-
-            handleApiResponse(response, data, executionDuration);
+            handleApiResponse(response, data, duration);
         } catch (err) {
             handleApiError(err.message);
         }
     }
 
-    // Utilities
     function setLoadingState(message) {
         executeBtn.disabled = true;
         executeBtn.classList.add("opacity-50", "cursor-not-allowed");
-        
         tableWrapper.innerHTML = `
             <div class="p-16 text-center text-slate-500 space-y-3">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
@@ -699,7 +697,7 @@ export function render(container) {
 
         tableWrapper.innerHTML = `
             <div class="p-6 bg-rose-50 border-l-4 border-rose-500 text-rose-800 m-4 rounded-r-xl space-y-1">
-                <div class="font-bold text-xs uppercase tracking-wider">Database Execution Error</div>
+                <div class="font-bold text-xs uppercase tracking-wider">Execution Error</div>
                 <div class="text-xs font-mono break-all">${errorMessage}</div>
             </div>`;
         jsonViewer.textContent = JSON.stringify({ error: errorMessage }, null, 2);

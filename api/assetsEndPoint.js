@@ -3,7 +3,8 @@ import {
   getAllComputerAssets,
   getComputerAssetById,
   upsertComputerAsset,
-  updateComputerAssetStatus
+  updateComputerAssetStatus , 
+  deleteComputerAsset 
 } from "../database/computerAsset.js";
 
 const router = express.Router();
@@ -91,6 +92,19 @@ GET    /:id
 POST   /
 PUT    /:id/status
   `);
+});
+
+// delete computer asset
+router.delete("/:id"  ,async (req, res)=> {
+  try{
+     console.log("Deleting asset with ID:", req.params.id);
+    const assetId = req.params.id;
+    await deleteComputerAsset(assetId);
+    res.json({ success: true, message: "Asset deleted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+    console.error("Error deleting asset:", err);
+  }
 });
 
 export default router;

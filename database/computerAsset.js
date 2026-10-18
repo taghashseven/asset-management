@@ -72,9 +72,10 @@ export async function upsertComputerAsset(asset) {
         specs,
         location,
         bitlocker_key , 
-        description
+        description , 
+        hostname
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ? , ?)
 
       ON CONFLICT(serial_number)
       DO UPDATE SET
@@ -89,7 +90,8 @@ export async function upsertComputerAsset(asset) {
         specs = excluded.specs,
         location = excluded.location,
         bitlocker_key = excluded.bitlocker_key,
-        description = excluded.description
+        description = excluded.description , 
+        hostname = excluded.hostname
       `,
       [
         assetNumber,
@@ -104,7 +106,8 @@ export async function upsertComputerAsset(asset) {
         asset.specs,
         asset.location,
         asset.bitlocker_key,
-        asset.description
+        asset.description , 
+        asset.hostname
       ]
     );
 
@@ -166,3 +169,14 @@ export async function updateComputerAssetStatus(assetId, status) {
   );
 }
 
+// delete computer asset by id 
+export async function deleteComputerAsset(assetID){
+  return db.run(
+    `
+    DELETE FROM computer_assets
+    WHERE asset_id = ?
+    `,
+    [assetID]
+  );
+  
+}

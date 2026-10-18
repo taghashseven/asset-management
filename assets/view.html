@@ -23,7 +23,6 @@
       <p class="text-sm text-slate-400">Admin Dashboard</p>
     </div>
       <nav class="flex-1 p-4 space-y-2" id="sidebarNav">
-  <button class="nav-btn w-full text-left p-3 rounded bg-slate-800 font-semibold" data-module="dashboard">📊 Main Dashboard</button>
   <button class="nav-btn w-full text-left p-3 rounded bg-slate-800 font-semibold" data-module="employees">Employees</button>
   <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="user-resources">User and Resource</button>
   <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="forms">Forms</button>
@@ -64,6 +63,7 @@
 
   <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="api-database">API database</button>
   <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="form-submissions">Form Submissions</button>
+  <button class="nav-btn w-full text-left p-3 rounded hover:bg-slate-800" data-module="form001">Form</button>
 </nav>
   </aside>
 
@@ -87,7 +87,70 @@
           </button>
           <div id="columnDropdown" class="dropdown-menu hidden absolute right-0 mt-2 w-72 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 p-4 space-y-3 max-h-80 overflow-y-auto z-50"></div>
         </div>
-        <input id="searchBox" placeholder="Search..." class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <div class="relative flex items-center gap-2">
+          <input 
+            id="searchBox" 
+            placeholder="Search... (e.g., status:Deployed, images:empty)" 
+            class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-72"
+          >
+          <!-- Interactive Help Toggle Button -->
+          <button 
+            id="searchHelpBtn" 
+            type="button" 
+            title="How to use smart search"
+            class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-2 rounded-lg text-xs border border-slate-300 transition flex items-center gap-1"
+          >
+            <span>❓</span>
+            <span class="hidden sm:inline">Search Guide</span>
+          </button>
+
+          <!-- Search Syntax Help Modal Dropdown -->
+          <div 
+            id="searchHelpDropdown" 
+            class="hidden absolute right-0 top-12 w-96 bg-white border border-slate-200 shadow-2xl rounded-xl p-4 text-xs z-50 text-slate-700 space-y-3"
+          >
+            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+              <h4 class="font-bold text-slate-800 text-sm">💡 How to Use Smart Search</h4>
+              <button id="closeSearchHelpBtn" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+            </div>
+
+            <div class="space-y-2">
+              <div>
+                <span class="font-bold text-blue-700">1. Search Specific Fields</span>
+                <p class="text-slate-500">Format: <code class="bg-slate-100 px-1 py-0.5 rounded text-blue-800">fieldname:value</code></p>
+                <p class="italic text-[11px] text-slate-400">Example: <code class="text-slate-600">status:Deployed</code> or <code class="text-slate-600">department:IT</code></p>
+              </div>
+
+              <div>
+                <span class="font-bold text-blue-700">2. Find Empty / Blank Fields</span>
+                <p class="text-slate-500">Format: <code class="bg-slate-100 px-1 py-0.5 rounded text-blue-800">fieldname:empty</code> or <code class="bg-slate-100 px-1 py-0.5 rounded text-blue-800">fieldname:blank</code></p>
+                <p class="italic text-[11px] text-slate-400">Example: <code class="text-slate-600">bitlocker_key:empty</code> or <code class="text-slate-600">notes:blank</code></p>
+              </div>
+
+              <div>
+                <span class="font-bold text-blue-700">3. Search Files & Images</span>
+                <p class="text-slate-500">Search attached images or uploaded documents by name, extension, or missing status.</p>
+                <p class="italic text-[11px] text-slate-400">Examples: <code class="text-slate-600">images:empty</code>, <code class="text-slate-600">images:png</code>, or <code class="text-slate-600">forms:pdf</code></p>
+              </div>
+
+              <div>
+                <span class="font-bold text-blue-700">4. Exact Phrase Search</span>
+                <p class="text-slate-500">Use double quotes for multi-word terms.</p>
+                <p class="italic text-[11px] text-slate-400">Example: <code class="text-slate-600">job_title:"Systems Engineer"</code></p>
+              </div>
+
+              <div>
+                <span class="font-bold text-blue-700">5. Combine Conditions (OR Logic)</span>
+                <p class="text-slate-500">Use <code class="bg-slate-100 px-1 py-0.5 rounded font-bold text-slate-800">OR</code> between queries.</p>
+                <p class="italic text-[11px] text-slate-400">Example: <code class="text-slate-600">status:Available OR status:"In Repair"</code></p>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-400 italic">
+              Tip: Standard text search without field names still searches across all visible columns simultaneously.
+            </div>
+          </div>
+        </div>
         <button id="newBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ New Record</button>
       </div>
     </header>
@@ -111,8 +174,8 @@
                 <option value="5">5</option>
                 <option value="10">10</option>
                 <option value="25">25</option>
-                <option value="50" selected>50</option>
-                <option value="100">100</option>
+                <option value="50" >50</option>
+                <option value="100" selected>100</option>
               </select>
               entries
             </div>
