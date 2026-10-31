@@ -14,6 +14,9 @@ import authService  from "./admin/auth.endpoint.js";
 import otherEquipment from "./api/otherEquipment.js";
 import databaseApi from "./api/databaseApi.js"
 import printerAPI from "./api/printerAPI.js"
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./swagger.js";
+
 // middlware 
 import { authenticate } from "./middleware/auth.js";
 
@@ -51,11 +54,22 @@ app.use((req, res, next) => {
 });
 
 
+// Swagger API documentation
+app.get("/api-docs.json", (req, res) => {
+    res.json(swaggerSpec);
+});
+
+app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec)
+);
+
 // 1. Serve static assets out of the "public" directory
 app.use(express.static(path.join(__dirname, "public")));
 
 // auth endpoint 
-app.use("/api/auth", authService);
+// app.use("/api/auth", authService);
 
 // 2. Mount API route
 app.use("/api/printers", printerRoutes);

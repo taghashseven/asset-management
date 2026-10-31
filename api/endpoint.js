@@ -6,8 +6,24 @@ import { getAllForms } from "../database/form.js";
 const router = express.Router();
 
 /**
- * GET all employees
+ * @swagger
+ * tags:
+ *   - name: Assets
+ *     description: Asset management operations
  */
+
+/**
+ * @swagger
+ * /api/assets:
+ *   get:
+ *     summary: Retrieve assets
+ *     description: Returns the assets registered in the system.
+ *     tags: [Assets]
+ *     responses:
+ *       200:
+ *         description: Assets retrieved successfully
+ */
+
 router.get("/", async (req, res) => {
   try {
     const results = await Employee.getAll();
