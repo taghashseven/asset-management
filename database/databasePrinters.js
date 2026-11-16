@@ -254,7 +254,8 @@ export async function getAllPrinters() {
                 const dbToners = await db.all(
                     `SELECT toner_code, created_at, initial_page , current_page
                      FROM printer_toners
-                     WHERE printer_id = ? `,
+                     WHERE printer_id = ?
+                     ORDER BY id DESC`,
                     [targetPrinter.printer_id]
                 );
 
