@@ -292,7 +292,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.addEventListener("click", closeColumnDropdown);
   document.getElementById("closeDrawerBtn")?.addEventListener("click", closeDrawer);
 
-  loadModule("dashboard");
+  loadModule("employees");
 });
 
 /* ==========================================================================
