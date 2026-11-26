@@ -32,12 +32,12 @@ export function render(filteredData, currentPage, pageSize) {
       body += `<tr class="border-t hover:bg-slate-50 align-top">
         <td class="p-2 font-medium text-xs">${startIndex + index + 1}</td>
         <td class="p-2">
-          <div class="font-bold text-slate-900 text-xs">${row.first_name} ${row.last_name}</div>
+          <button type="button" data-open-employee="${row.employee_id}" class="text-left font-bold text-slate-900 text-xs hover:text-blue-700 hover:underline">${row.first_name} ${row.last_name}</button>
           <div class="text-slate-500 text-[11px] font-mono select-all">${row.email}</div>
           <div class="mt-1 text-[10px] text-slate-400 uppercase tracking-wider font-semibold">${row.department || 'N/A'}</div>
         </td>
-        <td class="p-2 space-y-1">${renderHardwareChips(row.computers, 'bg-slate-800 border-blue-500')}</td>
-        <td class="p-2 space-y-1">${renderHardwareChips(row.monitors, 'bg-slate-700 border-teal-500')}</td>
+        <td class="p-2 space-y-1">${renderHardwareChips(row.computers, 'bg-slate-800 border-blue-500', 'computer')}</td>
+        <td class="p-2 space-y-1">${renderHardwareChips(row.monitors, 'bg-slate-700 border-teal-500', 'monitor')}</td>
         <td class="p-2 text-center">
           <button data-id="${row.employee_id}" class="usr-edit-btn bg-amber-500 text-white px-2.5 py-1 rounded text-xs hover:bg-amber-600 transition">Edit</button>
         </td>
@@ -54,15 +54,15 @@ export function render(filteredData, currentPage, pageSize) {
   updatePaginationFooter(totalRecords, startIndex, endIndex, totalPages);
 }
 
-function renderHardwareChips(assets, classes) {
+function renderHardwareChips(assets, classes, type) {
   if (!assets || assets.length === 0) return `<span class="text-slate-400 italic text-[11px]">None Active</span>`;
   return assets.map(asset => `
     <div class="${classes} text-slate-100 p-2 rounded shadow-sm border-l-4 flex justify-between items-center text-[11px]" 
       data-serial="${asset.serial_number}">
-      <div class="serial_chip cursor-pointer" data-serial="${asset.serial_number}" onclick="handleSerialClick('${asset.serial_number}')">
+      <button type="button" class="serial_chip text-left" data-open-asset="${type}" data-serial-number="${String(asset.serial_number).replaceAll("&", "&amp;").replaceAll('"', "&quot;")}">
         <strong class="block truncate max-w-[180px]">${asset.brand} ${asset.model}</strong>
         <span class="text-[10px] text-slate-400 block">S/N: ${asset.serial_number}</span>
-      </div>
+      </button>
       <span class="text-[9px] bg-black/30 px-1.5 py-0.5 rounded font-mono text-slate-300 ml-1">${asset.asset_number || 'N/A'}</span>
     </div>
   `).join('');

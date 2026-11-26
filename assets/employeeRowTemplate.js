@@ -83,7 +83,7 @@ export function render(filteredData, currentPage, pageSize) {
       bodyMarkup += `<td class="p-2 font-medium text-xs">${startIndex + index + 1}</td>`;
       
       if (visibleFields.includes("first_name") || visibleFields.includes("last_name")) {
-        bodyMarkup += `<td class="whitespace-nowrap px-4 py-3 text-sm font-medium" style="width: ${nameWidth}px;">${employee.first_name || ''} ${employee.last_name || ''}</td>`;
+        bodyMarkup += `<td class="whitespace-nowrap px-4 py-3 text-sm font-medium" style="width: ${nameWidth}px;"><button type="button" data-open-employee="${employee.employee_id}" class="text-left hover:text-blue-700 hover:underline">${employee.first_name || ''} ${employee.last_name || ''}</button></td>`;
       }
       if (visibleFields.includes("email")) {
         bodyMarkup += `<td class="whitespace-nowrap px-4 py-3 text-sm opacity-90" style="width: ${emailWidth}px;">${employee.email || ''}</td>`;
@@ -133,6 +133,7 @@ export function render(filteredData, currentPage, pageSize) {
 
       bodyMarkup += `
           <td class="p-2 text-center" style="width: 100px;">
+            <button type="button" data-open-employee="${employee.employee_id}" class="bg-blue-600 text-white px-2.5 py-1 rounded text-xs hover:bg-blue-700 transition">View</button>
             <button data-id="${employee.employee_id}" class="edit-action-btn bg-amber-500 text-white px-2.5 py-1 rounded text-xs hover:bg-amber-600 transition">Edit</button>
           </td>
         </tr>

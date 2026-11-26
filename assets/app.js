@@ -2,6 +2,12 @@
    APP CONFIGURATION & SCHEMA DEFINITIONS
    ========================================================================== */
 
+import {
+  initializeRecordDetails,
+  openAssetDetails,
+  openEmployeeDetails
+} from "./recordDetails.js";
+
 export const CONFIG = {
 
   employees: {
@@ -11,6 +17,7 @@ export const CONFIG = {
     },
     idField: "employee_id",
     fields: ["employee_id", "email", "first_name", "last_name", "department", "job_title", "active"],
+    requiredFields: ["email", "first_name", "last_name"],
     fieldTypes: {
       active: ["true", "false"]
     },
@@ -54,6 +61,7 @@ export const CONFIG = {
     create: "/api/employees/forms/create",
     idField: "form_id",
     fields: ["form_id", "employee_id", "file_path", "email"],
+    requiredFields: ["employee_id", "file_path"],
     fieldTypes: {
       date_submitted: "date",
       file_path: {
@@ -85,6 +93,7 @@ export const CONFIG = {
     deleteEndPoint : "/api/assets" ,
     idField: "asset_id",
     fields: ["asset_number", "serial_number", "device_type", "brand", "model", "status", "bitlocker_key", "assigned_to", "location" , "description" , "hostname"  , "specs","images" , "first_name" , "last_name" , "job_title"],
+    requiredFields: ["serial_number", "device_type"],
     fieldTypes: {
       status: {
         type: "select",
@@ -112,6 +121,7 @@ export const CONFIG = {
     update: "/api/assignments/update",
     idField: "assignment_id",
     fields: ["serial_number", "assignment_id", "employee_email", "date_issued", "date_returned", "notes"],
+    requiredFields: ["serial_number", "employee_email"],
     fieldTypes: {
       date_issued: "date",
       date_returned: "date",
@@ -134,6 +144,7 @@ export const CONFIG = {
     endpoint: "/api/monitors",
     idField: "monitor_id",
     fields: ["asset_number", "serial_number", "brand", "model", "status" , "images"],
+    requiredFields: ["serial_number"],
     fieldTypes: {
       status: ["Available", "Deployed", "In Repair"] , 
       images : {
@@ -149,6 +160,7 @@ export const CONFIG = {
     update : "/api/usermonitors/update" ,
     idField: "id",
     fields: ["id" ,"monitor_serial_number", "employee_email", "date_issued", "date_returned"],
+    requiredFields: ["monitor_serial_number", "employee_email"],
     fieldTypes: {
       date_issued: "date",
       date_returned: "date"
@@ -160,6 +172,7 @@ export const CONFIG = {
     endpoint: "/api/other-equipment",
     idField: "equipment_id",
     fields: ["equipment_id", "name", "serial_number", "description", "images"],
+    requiredFields: ["name"],
     fieldTypes: {
       images: {
         type: "array",
@@ -178,6 +191,7 @@ export const CONFIG = {
     idField: "printer_id",
     update : "/api/print/upsert" ,
     fields: ["asset_tag", "printer_name", "brand", "model", "status", "IP_address", "location",  "page_count"],
+    requiredFields: ["printer_name"],
     fieldTypes: {
       status: ["Online", "Offline", "Maintenance"],
       page_count: "number"
@@ -189,6 +203,7 @@ export const CONFIG = {
     endpoint: "/api/printers/toner-stock",
     idField: "id",
     fields: ["toner_code", "description", "quantity"],
+    requiredFields: ["toner_code"],
     fieldTypes: {
       quantity: "number"
     },
@@ -201,6 +216,7 @@ export const CONFIG = {
     customViewFile: "./printerListView.js",
     idField: "printer_id",
     fields: ["printer_id", "printer_name", "brand", "model", "ip_address", "mac_address", "status", "is_color", "page_count", "location", "toner_code" , "images"],
+    requiredFields: ["printer_name"],
     fieldTypes: {
       status: ["Active", "Inactive", "Retired", "standby"],
       is_color: [0, 1],
@@ -217,6 +233,7 @@ export const CONFIG = {
     endpoint: (printerId) => `/api/printers/logs/${printerId}`,
     idField: "id",
     fields: ["id", "printer_id", "created_at", "description", "event_type", "toner_code"],
+    requiredFields: ["event_type"],
     fieldTypes: {
       created_at: "date",
       event_type: ["TONER_REPLACEMENT", "SERVICE", "REPAIR", "GENERAL", "ERROR"],
@@ -244,6 +261,11 @@ export const CONFIG = {
     standalone: true
   },
 
+  "system-alerts": {
+    endpoint: "/api/views/alerts",
+    customViewFile: "./systemAlertsView.js",
+    standalone: true
+  },
 
 };
 
@@ -262,15 +284,78 @@ export let fieldWidths = {};
 
 let editId = null;
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
+}
+
+async function updateAlertsBadge() {
+  const badge = document.getElementById("systemAlertsCount");
+  if (!badge) return;
+
+  try {
+    const response = await fetch("/api/views/alerts");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const alerts = await response.json();
+    badge.textContent = alerts.length > 99 ? "99+" : String(alerts.length);
+    badge.classList.toggle("hidden", alerts.length === 0);
+  } catch (error) {
+    console.error("Could not refresh system alerts count:", error);
+    badge.classList.add("hidden");
+  }
+}
+
+function setActiveNavigation(module) {
+  document.querySelectorAll(".nav-btn").forEach(button => {
+    const isActive = button.dataset.module === module;
+    button.classList.toggle("bg-slate-800", isActive);
+    button.classList.toggle("text-white", isActive);
+    button.classList.toggle("font-semibold", isActive);
+    if (isActive) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+}
+
 /* ==========================================================================
    INITIALIZATION & EVENT HOOKS
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
+  initializeRecordDetails();
+  updateAlertsBadge();
+
+  document.body.addEventListener("click", event => {
+    const employeeButton = event.target.closest("[data-open-employee]");
+    if (employeeButton) {
+      openEmployeeDetails(employeeButton.dataset.openEmployee);
+      return;
+    }
+
+    const assetButton = event.target.closest("[data-open-asset]");
+    if (assetButton) {
+      openAssetDetails(assetButton.dataset.openAsset, assetButton.dataset.serialNumber);
+    }
+  });
+
+  document.addEventListener("asset-assignment-changed", async event => {
+    await loadModule(currentModule, true, activePrinterId);
+    updateAlertsBadge();
+    openAssetDetails(event.detail.type, event.detail.serialNumber);
+  });
+
+  document.addEventListener("employee-resource-assignment-changed", async event => {
+    await loadModule(currentModule, true, activePrinterId);
+    updateAlertsBadge();
+    openEmployeeDetails(event.detail.employeeId);
+  });
+
   document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("bg-slate-800"));
-      btn.classList.add("bg-slate-800");
       activePrinterId = null;
       loadModule(btn.dataset.module);
     });
@@ -421,6 +506,7 @@ function renderColumnSelector() {
 export async function loadModule(module, forceRefresh = false, dynamicParam = null) {
   currentModule = module;
   currentPage = 1;
+  setActiveNavigation(module);
 
   if (module === "printer-logs" && dynamicParam) {
     activePrinterId = dynamicParam;
@@ -488,6 +574,7 @@ export async function loadModule(module, forceRefresh = false, dynamicParam = nu
 
       masterData = await response.json();
       filteredData = [...masterData];
+      if (module === "employees") updateAlertsBadge();
     }
     renderRouter();
   } catch (err) {
@@ -500,10 +587,6 @@ export async function loadModule(module, forceRefresh = false, dynamicParam = nu
 }
 
 export function navigateToModuleWithParam(moduleName, paramValue) {
-  document.querySelectorAll(".nav-btn").forEach((b) => {
-    b.classList.remove("bg-slate-800");
-    if (b.dataset.module === moduleName) b.classList.add("bg-slate-800");
-  });
   loadModule(moduleName, false, paramValue);
 }
 
@@ -555,13 +638,21 @@ export function renderDefaultTable(data = [], config = {}) {
   if (!tableBody) return;
 
   if (!Array.isArray(data) || data.length === 0) {
+    const hasSearch = Boolean(document.getElementById("searchBox")?.value.trim());
     tableBody.innerHTML = `
       <tr>
-        <td colspan="100" class="p-8 text-center text-slate-400 font-medium bg-white rounded-lg border border-slate-200">
-          No records found.
+        <td colspan="100" class="p-8 text-center bg-white rounded-lg border border-slate-200" aria-live="polite">
+          <p class="font-medium text-slate-600">${hasSearch ? "No matching records found." : "No records found."}</p>
+          ${hasSearch ? `<button id="clearSearchButton" type="button" class="mt-2 text-sm font-semibold text-blue-700 hover:underline">Clear search</button>` : ""}
         </td>
       </tr>
     `;
+    document.getElementById("clearSearchButton")?.addEventListener("click", () => {
+      const searchBox = document.getElementById("searchBox");
+      if (searchBox) searchBox.value = "";
+      filterTable("");
+      searchBox?.focus();
+    });
     return;
   }
 
@@ -574,6 +665,12 @@ export function renderDefaultTable(data = [], config = {}) {
   const headers = allHeaders.filter((field) => visibleFields.includes(field));
 
   const fieldTypes = config.fieldTypes || {};
+  const resourceDetailConfig = {
+    "computer-assets": { type: "computer", serialField: "serial_number" },
+    "asset-assignments": { type: "computer", serialField: "serial_number" },
+    monitors: { type: "monitor", serialField: "serial_number" },
+    "monitor-assignments": { type: "monitor", serialField: "monitor_serial_number" }
+  }[currentModule];
 
   // Build Table Headers with Inline Width Styling
   const headerRowHTML = headers.map(header => {
@@ -692,7 +789,9 @@ export function renderDefaultTable(data = [], config = {}) {
         const strValue = String(rawValue ?? '-');
         const truncateLimit = (typeof fieldConfig === 'object') ? parseInt(fieldConfig.truncate || fieldConfig.maxLen) : NaN;
 
-        if (!isNaN(truncateLimit) && strValue.length > truncateLimit) {
+        if (resourceDetailConfig && header === resourceDetailConfig.serialField) {
+          cellContent = `<button type="button" data-open-asset="${resourceDetailConfig.type}" data-serial-number="${escapeHtml(strValue)}" class="font-mono text-xs text-blue-700 hover:underline">${escapeHtml(strValue)}</button>`;
+        } else if (!isNaN(truncateLimit) && strValue.length > truncateLimit) {
           const shortText = strValue.substring(0, truncateLimit) + '...';
           cellContent = `
             <div class="inline-flex items-center gap-1.5 group" title="${strValue}">
@@ -710,8 +809,15 @@ export function renderDefaultTable(data = [], config = {}) {
       return `<td class="px-4 py-3 align-middle">${cellContent}</td>`;
     }).join('');
 
+    const detailAction = currentModule === "employees"
+      ? `<button type="button" data-open-employee="${recordId}" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900 hover:underline">View</button>`
+      : resourceDetailConfig
+        ? `<button type="button" data-open-asset="${resourceDetailConfig.type}" data-serial-number="${escapeHtml(row[resourceDetailConfig.serialField] || "")}" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900 hover:underline">History</button>`
+        : "";
+
     const actionsHTML = `
       <td class="px-4 py-3 text-right align-middle space-x-2">
+        ${detailAction}
         <button onclick="editRecord('${recordId}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">Edit</button>
         ${config.delete ? `<button onclick="deleteRecord('${recordId}')" class="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline">Delete</button>` : ''}
       </td>
@@ -925,7 +1031,13 @@ function checkValueMatch(rowVal, queryVal) {
 export function generateFormFieldHTML(field, value = "", config = {}, recordId = null) {
   const types = config.fieldTypes || {};
   const fieldConfig = types[field];
-  const labelText = field.replaceAll("_", " ").toUpperCase();
+  const labelText = escapeHtml(field.replaceAll("_", " ").toUpperCase());
+  const required = config.requiredFields?.includes(field) || fieldConfig?.required === true;
+  const requiredMark = required ? `<span class="ml-1 text-rose-600" aria-hidden="true">*</span><span class="sr-only"> required</span>` : "";
+  const helpText = fieldConfig?.helpText
+    ? `<p id="help-${escapeHtml(field)}" class="mt-1 text-xs text-slate-500">${escapeHtml(fieldConfig.helpText)}</p>`
+    : "";
+  const fieldId = `field-${currentModule}-${field}`;
 
   // --- 1. SELECT DROPDOWN HANDLER ---
   const isSelectType = typeof fieldConfig === "object" && fieldConfig?.type === "select";
@@ -934,16 +1046,17 @@ export function generateFormFieldHTML(field, value = "", config = {}, recordId =
   if (selectOptions) {
     const optionsHTML = selectOptions.map((opt) => {
       const isSelected = String(value) === String(opt) ? "selected" : "";
-      return `<option value="${opt}" ${isSelected}>${opt}</option>`;
+      return `<option value="${escapeHtml(opt)}" ${isSelected}>${escapeHtml(opt)}</option>`;
     }).join("");
 
     return `
       <div>
-        <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
-        <select name="${field}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <label for="${fieldId}" class="block mb-1 font-medium text-sm text-slate-700">${labelText}${requiredMark}</label>
+        <select id="${fieldId}" name="${field}" ${required ? "required" : ""} ${fieldConfig?.helpText ? `aria-describedby="help-${escapeHtml(field)}"` : ""} class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
           <option value="">-- Select ${labelText} --</option>
           ${optionsHTML}
         </select>
+        ${helpText}
       </div>
     `;
   }
@@ -1005,19 +1118,28 @@ export function generateFormFieldHTML(field, value = "", config = {}, recordId =
   if (typeof fieldConfig === "object" && fieldConfig.type === "lookup") {
     return `
       <div class="relative lookup-container" data-field="${field}">
-        <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
+        <label for="lookup-input-${field}" class="block mb-1 font-medium text-sm text-slate-700">${labelText}${requiredMark}</label>
         <div class="relative">
           <input 
             type="text" 
             id="lookup-input-${field}" 
-            placeholder="Type user email or name to search..." 
+            value="${escapeHtml(value)}"
+            placeholder="${escapeHtml(fieldConfig.placeholder || "Type to search and select a result…")}"
+            ${required ? "required" : ""}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="lookup-results-${field}"
+            aria-describedby="lookup-help-${field}"
             class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             autocomplete="off"
           />
-          <input type="hidden" name="${field}" id="lookup-hidden-${field}" value="${value ?? ''}" />
+          <input type="hidden" name="${field}" id="lookup-hidden-${field}" value="${escapeHtml(value)}" />
         </div>
+        <p id="lookup-help-${field}" class="mt-1 text-xs text-slate-500">${escapeHtml(fieldConfig.helpText || "Choose an item from the suggestions to confirm your selection.")}</p>
         <div 
           id="lookup-results-${field}" 
+          role="listbox"
           class="hidden absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
         ></div>
       </div>
@@ -1031,16 +1153,24 @@ export function generateFormFieldHTML(field, value = "", config = {}, recordId =
   if (fieldType === "textarea") {
     return `
       <div>
-        <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
-        <textarea name="${field}" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" ${isReadOnly}>${value ?? ""}</textarea>
+        <label for="${fieldId}" class="block mb-1 font-medium text-sm text-slate-700">${labelText}${requiredMark}</label>
+        <textarea id="${fieldId}" name="${field}" ${required ? "required" : ""} ${fieldConfig?.helpText ? `aria-describedby="help-${escapeHtml(field)}"` : ""} class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" ${isReadOnly}>${escapeHtml(value)}</textarea>
+        ${helpText}
       </div>`;
   }
 
   // --- 4. STANDARD INPUT FIELD ---
+  const isFileInput = fieldType === "file";
+  const requiredAttribute = required && (!isFileInput || !recordId) ? "required" : "";
+  const fileLink = isFileInput && value
+    ? `<p class="mb-1 text-xs text-slate-500">Current file: <a class="text-blue-700 underline" href="/${encodeURI(String(value))}" target="_blank" rel="noopener">View existing file</a></p>`
+    : "";
   return `
     <div>
-      <label class="block mb-1 font-medium text-sm text-slate-700">${labelText}</label>
-      <input type="${fieldType}" name="${field}" value="${value ?? ""}" ${isReadOnly} class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadOnly ? 'bg-slate-100 text-slate-500' : ''}">
+      <label for="${fieldId}" class="block mb-1 font-medium text-sm text-slate-700">${labelText}${requiredMark}</label>
+      ${fileLink}
+      <input id="${fieldId}" type="${escapeHtml(fieldType)}" name="${field}" ${isFileInput ? "" : `value="${escapeHtml(value)}"`} ${requiredAttribute} ${fieldConfig?.helpText ? `aria-describedby="help-${escapeHtml(field)}"` : ""} ${isReadOnly} class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadOnly ? 'bg-slate-100 text-slate-500' : ''}">
+      ${helpText}
     </div>`;
 }
 
@@ -1060,14 +1190,17 @@ export function setupFormLookups(config, rowData = null) {
     const resultsContainer = container.querySelector(`#lookup-results-${fieldName}`);
 
     let cache = null;
+    let cacheError = null;
 
     const loadCache = async () => {
       if (!cache && fieldConfig.searchEndpoint) {
         try {
           const res = await fetch(fieldConfig.searchEndpoint);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           cache = await res.json();
         } catch (err) {
-          console.error("Failed to fetch lookup data:", err);
+          cacheError = err.message;
+          console.error(`Failed to load choices for ${fieldName}:`, err);
         }
       }
       return cache;
@@ -1083,6 +1216,7 @@ export function setupFormLookups(config, rowData = null) {
         } else {
           searchInput.value = rowData[fieldName];
         }
+        searchInput.setCustomValidity("");
       });
     }
 
@@ -1094,11 +1228,22 @@ export function setupFormLookups(config, rowData = null) {
     // Handle real-time user query search
     searchInput.addEventListener("input", async (e) => {
       const query = e.target.value.toLowerCase().trim();
+      hiddenInput.value = "";
+      searchInput.setCustomValidity(query ? "Select a matching result from the list." : "");
+      searchInput.setAttribute("aria-invalid", query ? "true" : "false");
       const dataset = await loadCache();
 
-      if (!query || !dataset) {
+      if (!query) {
         resultsContainer.innerHTML = "";
         resultsContainer.classList.add("hidden");
+        searchInput.setAttribute("aria-expanded", "false");
+        return;
+      }
+
+      if (!dataset) {
+        resultsContainer.innerHTML = `<div class="p-2.5 text-xs text-rose-700">Could not load choices. ${escapeHtml(cacheError || "Please try again.")}</div>`;
+        resultsContainer.classList.remove("hidden");
+        searchInput.setAttribute("aria-expanded", "true");
         return;
       }
 
@@ -1109,7 +1254,7 @@ export function setupFormLookups(config, rowData = null) {
       });
 
       if (matches.length === 0) {
-        resultsContainer.innerHTML = `<div class="p-2.5 text-xs text-slate-400 font-medium">No matching records found</div>`;
+        resultsContainer.innerHTML = `<div class="p-2.5 text-xs text-slate-600 font-medium">No matching records. Check the spelling or search by email.</div>`;
       } else {
         resultsContainer.innerHTML = matches.map((item) => {
           const label = fieldConfig.displayFormat
@@ -1118,18 +1263,21 @@ export function setupFormLookups(config, rowData = null) {
 
           return `
             <div 
-              class="lookup-item p-2 hover:bg-blue-50 cursor-pointer text-xs border-b border-slate-100 last:border-b-0 text-slate-700 font-medium transition"
-              data-id="${item[fieldConfig.targetField]}"
-              data-email="${item.email || ''}"
-              data-label="${label}"
+              class="lookup-item p-2 hover:bg-blue-50 focus:bg-blue-50 cursor-pointer text-xs border-b border-slate-100 last:border-b-0 text-slate-700 font-medium transition"
+              role="option"
+              tabindex="0"
+              data-id="${escapeHtml(item[fieldConfig.targetField])}"
+              data-email="${escapeHtml(item.email || '')}"
+              data-label="${escapeHtml(label)}"
             >
-              ${label}
+              ${escapeHtml(label)}
             </div>
           `;
         }).join("");
       }
 
       resultsContainer.classList.remove("hidden");
+      searchInput.setAttribute("aria-expanded", "true");
     });
 
     // Handle user selection from dropdown options
@@ -1143,6 +1291,9 @@ export function setupFormLookups(config, rowData = null) {
 
       hiddenInput.value = selectedId;
       searchInput.value = selectedLabel;
+      searchInput.setCustomValidity("");
+      searchInput.setAttribute("aria-invalid", "false");
+      searchInput.setAttribute("aria-expanded", "false");
 
       // Auto-fill connected read-only inputs in form (e.g. email)
       const form = container.closest("form");
@@ -1154,10 +1305,22 @@ export function setupFormLookups(config, rowData = null) {
       resultsContainer.classList.add("hidden");
     });
 
+    resultsContainer.addEventListener("keydown", event => {
+      if ((event.key === "Enter" || event.key === " ") && event.target.closest(".lookup-item")) {
+        event.preventDefault();
+        event.target.closest(".lookup-item").click();
+      } else if (event.key === "Escape") {
+        resultsContainer.classList.add("hidden");
+        searchInput.setAttribute("aria-expanded", "false");
+        searchInput.focus();
+      }
+    });
+
     // Dismiss results on clicking outside
     document.addEventListener("click", (e) => {
       if (!container.contains(e.target)) {
         resultsContainer.classList.add("hidden");
+        searchInput.setAttribute("aria-expanded", "false");
       }
     });
   });
@@ -1287,82 +1450,127 @@ function editRecord(id) {
 async function saveRecord(e) {
   e.preventDefault();
   const form = e.target;
-  const formData = new FormData(form);
-  const config = CONFIG[currentModule];
-  const payload = {};
-
-  const toBase64 = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = (error) => reject(error);
-  });
-
-  for (const [key, value] of formData.entries()) {
-    if (!key.endsWith("[]") && !(value instanceof File)) {
-      payload[key] = value;
-    }
+  if (form.dataset.submitting === "true") return;
+  form.dataset.submitting = "true";
+  form.setAttribute("aria-busy", "true");
+  const submitButton = form.querySelector('button[type="submit"]');
+  const originalButtonText = submitButton?.textContent || "Save";
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Saving...";
   }
 
-  const fileInputs = form.querySelectorAll('input[type="file"]');
-  for (const input of fileInputs) {
-    if (input.files?.length > 0) {
-      const rawFieldName = input.name.replace("[]", "");
-      if (!payload[rawFieldName]) payload[rawFieldName] = [];
+  const moduleName = currentModule;
+  const recordId = editId;
+  try {
+    const config = CONFIG[moduleName];
+    if (!config) throw new Error("This form is no longer connected to an active module.");
+    const formData = new FormData(form);
+    const payload = {};
 
-      for (const file of input.files) {
-        if (file.size > 0) {
-          const base64String = await toBase64(file);
-          payload[rawFieldName].push({
-            filename: file.name,
-            string: base64String
-          });
+    const toBase64 = file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error(`Could not read file "${file.name}".`));
+    });
+
+    for (const [key, value] of formData.entries()) {
+      if (!key.endsWith("[]") && !(value instanceof File)) {
+        payload[key] = value;
+      }
+    }
+
+    for (const input of form.querySelectorAll('input[type="file"]')) {
+      if (input.files?.length > 0) {
+        const rawFieldName = input.name.replace("[]", "");
+        if (!payload[rawFieldName]) payload[rawFieldName] = [];
+        for (const file of input.files) {
+          if (file.size > 0) {
+            payload[rawFieldName].push({
+              filename: file.name,
+              string: await toBase64(file)
+            });
+          }
         }
       }
     }
-  }
 
-  // --- Check for custom field override endpoint (e.g., updateField) ---
-  let customUpdateEndpoint = null;
-  if (editId && config.fieldTypes) {
-    Object.keys(config.fieldTypes).forEach((fKey) => {
-      if (typeof config.fieldTypes[fKey] === "object" && config.fieldTypes[fKey].updateField?.endpoint) {
-        customUpdateEndpoint = config.fieldTypes[fKey].updateField.endpoint;
+    let customUpdateEndpoint = null;
+    if (recordId && config.fieldTypes) {
+      for (const fieldConfig of Object.values(config.fieldTypes)) {
+        if (typeof fieldConfig === "object" && fieldConfig.updateField?.endpoint) {
+          customUpdateEndpoint = fieldConfig.updateField.endpoint;
+          break;
+        }
       }
-    });
-  }
+    }
 
-  let targetUrl = editId
-    ? customUpdateEndpoint || config.update || config.endpoint
-    : config.create || config.endpoint;
+    let targetUrl = recordId
+      ? customUpdateEndpoint || config.update || config.endpoint
+      : config.create || config.endpoint;
+    if (typeof targetUrl === "function") {
+      targetUrl = targetUrl(activePrinterId || payload[config.idField]);
+    }
+    if (!targetUrl) throw new Error("No save endpoint is configured for this form.");
 
-  if (typeof targetUrl === "function") {
-    targetUrl = targetUrl(activePrinterId || payload[config.idField]);
-  }
-
-  try {
     const response = await fetch(targetUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok) throw new Error(`HTTP error status: ${response.status}`);
+    const responseText = await response.text();
+    let responseData = null;
+    if (responseText) {
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = null;
+      }
+    }
+    if (!response.ok) {
+      throw new Error(responseData?.error || responseData?.message || responseText || `HTTP ${response.status}`);
+    }
 
-    showToast(editId ? "Record updated successfully!" : "Record created successfully!", "success");
+    showToast(recordId ? "Record updated successfully!" : "Record created successfully!", "success");
     closeDrawer();
-    loadModule(currentModule, true, activePrinterId);
+    if (currentModule === moduleName) {
+      await loadModule(moduleName, true, activePrinterId);
+    }
   } catch (err) {
     console.error("Failed to execute save operation:", err);
     showToast(`Failed to save record: ${err.message}`, "error");
+  } finally {
+    form.dataset.submitting = "false";
+    form.removeAttribute("aria-busy");
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
+    }
   }
 }
 
 async function deleteRecord(id) {
-  const config = CONFIG[currentModule];
-  if (!confirm("Are you sure you want to permanently delete this record?")) return;
+  const moduleName = currentModule;
+  const config = CONFIG[moduleName];
+  const row = masterData.find(item => String(item[config.idField]) === String(id));
+  const recordLabel = row
+    ? [
+        [row.first_name, row.last_name].filter(Boolean).join(" "),
+        row.email,
+        row.serial_number,
+        row.asset_number,
+        row.name,
+        row.printer_name
+      ].find(Boolean)
+    : null;
+  const description = recordLabel || `${moduleName.replaceAll("-", " ")} record ${id}`;
+  if (!confirm(`Permanently delete "${description}"? This action cannot be undone.`)) return;
 
-  const targetUrl =  config.deleteEndPoint ? `${config.deleteEndPoint}/${id}` :  `${config.endpoint}/${id}`;
+  const targetUrl = config.deleteEndPoint
+    ? `${config.deleteEndPoint}/${encodeURIComponent(id)}`
+    : `${config.endpoint}/${encodeURIComponent(id)}`;
 
   try {
     const response = await fetch(targetUrl, {
@@ -1370,10 +1578,15 @@ async function deleteRecord(id) {
       headers: { "Content-Type": "application/json" }
     });
 
-    if (!response.ok) throw new Error(`HTTP error status: ${response.status}`);
+    if (!response.ok) {
+      const responseText = await response.text();
+      throw new Error(responseText || `HTTP ${response.status}`);
+    }
 
     showToast("Record successfully deleted!", "success");
-    loadModule(currentModule, false, activePrinterId);
+    if (currentModule === moduleName) {
+      await loadModule(moduleName, false, activePrinterId);
+    }
   } catch (err) {
     showToast(`Failed to delete record: ${err.message}`, "error");
   }
@@ -1401,7 +1614,8 @@ export function navigateAndFilter(targetModule, searchKey) {
    ========================================================================== */
 
 export async function deleteExistingFile(moduleName, field, recordId, fileIdentifier, elementId) {
-  if (!confirm("Are you sure you want to delete this file permanently?")) return;
+  const fileName = String(fileIdentifier).split(/[\\/]/).pop() || String(fileIdentifier);
+  if (!confirm(`Permanently delete "${fileName}" from record ${recordId}? This cannot be undone.`)) return;
 
   const config = CONFIG[moduleName];
   const fieldConfig = config?.fieldTypes?.[field];
@@ -1418,7 +1632,10 @@ export async function deleteExistingFile(moduleName, field, recordId, fileIdenti
       })
     });
 
-    if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+    if (!response.ok) {
+      const responseText = await response.text();
+      throw new Error(responseText || `Server returned HTTP ${response.status}`);
+    }
 
     showToast("File deleted successfully!", "success");
 
@@ -1441,10 +1658,119 @@ export async function deleteExistingFile(moduleName, field, recordId, fileIdenti
    ========================================================================== */
 
 export function exportToExcel() {
-  const dataset = filteredData.length > 0 ? filteredData : masterData;
+  const dataset = currentModule === "computer-assets"
+    ? filteredData
+    : filteredData.length > 0 ? filteredData : masterData;
 
   if (!dataset || dataset.length === 0) {
     showToast("No data available to export.", "error");
+    return;
+  }
+
+  if (currentModule === "computer-assets") {
+    const headers = [
+      "SERIAL NUMBER",
+      "DEVICE TYPE",
+      "BRAND",
+      "ASSIGNED TO",
+      "LOCATION",
+      "FIRST NAME",
+      "LAST NAME",
+      "HOSTNAME",
+      "ASSET NUMBER",
+      "MODEL",
+      "Date",
+      "SPECS",
+      "Domain joined",
+      "Printing share",
+      "Sophos Installed",
+      "Bitlocker Enabled"
+    ];
+
+    const getValue = (row, ...keys) => {
+      for (const key of keys) {
+        if (row[key] !== undefined && row[key] !== null) return row[key];
+      }
+      return "";
+    };
+
+    const formatPurchaseDate = value => {
+      if (!value) return "";
+      const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
+      if (Number.isNaN(date.getTime())) return value;
+      return new Intl.DateTimeFormat("en", {
+        month: "short",
+        year: "2-digit",
+        timeZone: "UTC"
+      }).format(date).replace(" ", "-");
+    };
+
+    const groups = new Map();
+    dataset.forEach(row => {
+      const department = getValue(row, "employee_department", "department") || "Unassigned";
+      if (!groups.has(department)) groups.set(department, []);
+      groups.get(department).push(row);
+    });
+
+    const departmentNames = [...groups.keys()].sort((a, b) => {
+      if (a === "Unassigned") return 1;
+      if (b === "Unassigned") return -1;
+      return String(a).localeCompare(String(b), undefined, { sensitivity: "base" });
+    });
+    const sheetRows = [];
+    const merges = [];
+    let exportedCount = 0;
+
+    departmentNames.forEach((department, groupIndex) => {
+      if (groupIndex > 0) sheetRows.push([]);
+      const sectionRow = sheetRows.length;
+      sheetRows.push([`Department: ${department}`]);
+      merges.push({ s: { r: sectionRow, c: 0 }, e: { r: sectionRow, c: headers.length - 1 } });
+      sheetRows.push(headers);
+
+      const departmentRows = groups.get(department).sort((a, b) =>
+        String(getValue(a, "last_name") || "").localeCompare(String(getValue(b, "last_name") || "")) ||
+        String(getValue(a, "first_name") || "").localeCompare(String(getValue(b, "first_name") || "")) ||
+        String(getValue(a, "serial_number") || "").localeCompare(String(getValue(b, "serial_number") || ""))
+      );
+
+      departmentRows.forEach(row => {
+        sheetRows.push([
+          getValue(row, "serial_number"),
+          getValue(row, "device_type"),
+          getValue(row, "brand"),
+          getValue(row, "assigned_to", "employee_email"),
+          getValue(row, "location"),
+          getValue(row, "first_name"),
+          getValue(row, "last_name"),
+          getValue(row, "hostname"),
+          getValue(row, "asset_number"),
+          getValue(row, "model"),
+          formatPurchaseDate(getValue(row, "purchase_date", "date")),
+          getValue(row, "specs"),
+          getValue(row, "domain_joined", "Domain joined"),
+          getValue(row, "printing_share", "Printing share"),
+          getValue(row, "sophos_installed", "Sophos Installed"),
+          getValue(row, "bitlocker_enabled", "Bitlocker Enabled")
+        ]);
+        exportedCount++;
+      });
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
+    worksheet["!merges"] = merges;
+    worksheet["!cols"] = [
+      { wch: 18 }, { wch: 15 }, { wch: 14 }, { wch: 32 },
+      { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 22 },
+      { wch: 16 }, { wch: 34 }, { wch: 12 }, { wch: 72 },
+      { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 18 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Computer Assets");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `computer-assets_export_${dateStr}.xlsx`);
+    showToast(`Successfully exported ${exportedCount} records grouped by department to Excel!`, "success");
     return;
   }
 

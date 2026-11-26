@@ -11,6 +11,7 @@ export async function getAllComputerAssets() {
       e.first_name,
       e.last_name,
       e.job_title,
+      e.department AS employee_department,
       (
         SELECT json_group_array(image_path)
         FROM computer_asset_images cai

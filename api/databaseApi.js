@@ -1,8 +1,37 @@
 import express from "express";
 import db from "../database/db.js";
 import { getDatabaseSummary } from "../database/databaseSummary.js";
+import { getSystemAlerts } from "../database/view.js";
 
 const router = express.Router();
+
+function getCpuGeneration(specs = "") {
+  const ordinalGeneration = specs.match(/\b(\d{1,2})(?:st|nd|rd|th)\s*gen\b/i);
+  if (ordinalGeneration) return `Gen ${ordinalGeneration[1]}`;
+
+  const intelModel = specs.match(/\bi[3579][-\s]?(\d{4,5})[a-z]{0,3}\b/i);
+  if (!intelModel) return "Unknown";
+
+  const modelNumber = intelModel[1];
+  const generation = modelNumber.length === 4 ? modelNumber[0] : modelNumber.slice(0, 2);
+  return Number(generation) >= 5 ? `Gen ${generation}` : "Unknown";
+}
+
+function getRamSize(specs = "") {
+  const match = specs.match(/\b(\d{1,3})\s*GB\s*(?:DDR[345X]?\s*)?RAM\b/i)
+    || specs.match(/\bRAM\s*:?\s*(\d{1,3})\s*GB\b/i);
+  return match ? `${match[1]} GB` : "Unknown";
+}
+
+function getStorageType(specs = "") {
+  if (/\b(SSD|NVME|M\.2)\b/i.test(specs)) return "SSD";
+  if (/\b(HDD|hard\s*drive|hard\s*disk|[45]400\s*RPM|7200\s*RPM)\b/i.test(specs)) return "HDD";
+  return "Unknown";
+}
+
+function incrementCount(counts, label) {
+  counts[label] = (counts[label] || 0) + 1;
+}
 
 /**
  * GET Database Summary Schema
@@ -78,6 +107,182 @@ router.post("/table", async (req, res) => {
   }
 });
 
+
+router.get("/dashboard/overview", async (req, res) => {
+  try {
+    const [
+      employeeStats,
+      computers,
+      monitorStats,
+      employeesWithMultipleMonitors,
+      printers,
+      lowToners,
+      tonerPerformance,
+      errorStats,
+      recentErrors,
+      systemAlerts
+    ] = await Promise.all([
+      db.get(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) AS active,
+          SUM(CASE WHEN active = 0 THEN 1 ELSE 0 END) AS inactive
+        FROM employees
+      `),
+      db.all(`
+        SELECT
+          ca.device_type,
+          ca.specs,
+          ca.status,
+          CASE WHEN aa.assignment_id IS NULL THEN 0 ELSE 1 END AS assigned
+        FROM computer_assets ca
+        LEFT JOIN asset_assignments aa
+          ON aa.serial_number = ca.serial_number
+         AND aa.date_returned IS NULL
+      `),
+      db.get(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN ma.id IS NOT NULL THEN 1 ELSE 0 END) AS assigned
+        FROM monitors m
+        LEFT JOIN monitor_assignments ma
+          ON ma.monitor_serial_number = m.serial_number
+         AND ma.date_returned IS NULL
+      `),
+      db.all(`
+        SELECT
+          e.employee_id,
+          e.first_name,
+          e.last_name,
+          e.department,
+          COUNT(DISTINCT ma.monitor_serial_number) AS monitor_count
+        FROM employees e
+        JOIN monitor_assignments ma
+          ON ma.employee_email = e.email
+         AND ma.date_returned IS NULL
+        WHERE e.active = 1
+        GROUP BY e.employee_id
+        HAVING COUNT(DISTINCT ma.monitor_serial_number) >= 2
+        ORDER BY monitor_count DESC, e.last_name, e.first_name
+      `),
+      db.all(`
+        SELECT printer_id, printer_name, brand, model, status, page_count, location
+        FROM printers
+        ORDER BY page_count DESC
+      `),
+      db.all(`
+        SELECT
+          pt.printer_id,
+          p.printer_name,
+          pt.toner_code,
+          pt.toner_level
+        FROM printer_toners pt
+        JOIN printers p ON p.printer_id = pt.printer_id
+        WHERE pt.toner_level BETWEEN 0 AND 100
+          AND NOT EXISTS (
+            SELECT 1
+            FROM printer_toners newer
+            WHERE newer.printer_id = pt.printer_id
+              AND newer.toner_code = pt.toner_code
+              AND newer.id > pt.id
+          )
+        ORDER BY pt.toner_level ASC, p.printer_name
+      `),
+      db.get(`
+        SELECT
+          COUNT(*) AS cartridge_count,
+          AVG(COALESCE(pth.final_page_count, p.page_count) - pth.initial_page_count) AS average_pages
+        FROM printer_toner_history pth
+        JOIN printers p ON p.printer_id = pth.printer_id
+        WHERE COALESCE(pth.final_page_count, p.page_count) >= pth.initial_page_count
+      `),
+      db.get(`
+        SELECT COUNT(*) AS total
+        FROM printer_log
+        WHERE event_type = 'ERROR'
+      `),
+      db.all(`
+        SELECT
+          log.id,
+          log.printer_id,
+          printer.printer_name,
+          log.description,
+          log.created_at
+        FROM printer_log log
+        JOIN printers printer ON printer.printer_id = log.printer_id
+        WHERE log.event_type = 'ERROR'
+        ORDER BY log.created_at DESC, log.id DESC
+        LIMIT 8
+      `),
+      getSystemAlerts()
+    ]);
+
+    const deviceTypes = {};
+    const cpuGenerations = {};
+    const ramSizes = {};
+    const storageTypes = {};
+
+    for (const computer of computers) {
+      const rawType = String(computer.device_type || "Unknown").trim().toLowerCase();
+      const deviceType = rawType === "destkop" ? "Desktop" : rawType ? `${rawType[0].toUpperCase()}${rawType.slice(1)}` : "Unknown";
+      incrementCount(deviceTypes, deviceType);
+      incrementCount(cpuGenerations, getCpuGeneration(computer.specs || ""));
+      incrementCount(ramSizes, getRamSize(computer.specs || ""));
+      incrementCount(storageTypes, getStorageType(computer.specs || ""));
+    }
+
+    const assignedComputers = computers.filter(computer => computer.assigned).length;
+    const availableComputers = computers.filter(computer => String(computer.status).toLowerCase() === "available").length;
+    const computersInRepair = computers.filter(computer => ["repair", "maintenance", "broken"].includes(String(computer.status).toLowerCase())).length;
+    const tonerLifecycleAverage = tonerPerformance.average_pages === null
+      ? null
+      : Math.round(tonerPerformance.average_pages);
+
+    res.json({
+      employees: {
+        total: employeeStats.total || 0,
+        active: employeeStats.active || 0,
+        inactive: employeeStats.inactive || 0,
+        withMultipleMonitors: employeesWithMultipleMonitors.length,
+        multipleMonitorList: employeesWithMultipleMonitors
+      },
+      computers: {
+        total: computers.length,
+        assigned: assignedComputers,
+        available: availableComputers,
+        inRepair: computersInRepair,
+        byType: deviceTypes,
+        byGeneration: cpuGenerations,
+        byRam: ramSizes,
+        byStorage: storageTypes
+      },
+      monitors: {
+        total: monitorStats.total || 0,
+        assigned: monitorStats.assigned || 0
+      },
+      printers: {
+        total: printers.length,
+        mostUsed: printers[0] || null,
+        usage: printers.slice(0, 8),
+        lowTonerThreshold: 20,
+        lowToners,
+        averagePagesPerToner: tonerLifecycleAverage,
+        tonerHistoryCount: tonerPerformance.cartridge_count || 0
+      },
+      errors: {
+        total: errorStats.total || 0,
+        recent: recentErrors
+      },
+      systemAlerts: {
+        total: systemAlerts.length,
+        high: systemAlerts.filter(alert => alert.severity === "high").length
+      }
+    });
+  } catch (err) {
+    console.error("[DB Error] Visual dashboard overview failed:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.get("/dashboard", async (req, res) => {
   try {
